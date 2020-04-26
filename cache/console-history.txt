@@ -1,0 +1,127 @@
+let count = await counter.proxy(compound.address, callData);
+gasleft()
+gas()
+gas
+let count = await counter.proxy(compound.address, callData);
+callData
+var callData = contract.methods.sum(1, 2).encodeABI();
+const contract = new buidler.web3.eth.Contract(CompoundArtifact.abi, compound.address);
+CompoundArtifact.abi
+compound.address
+compound = await depcomp();
+counter = await depcount();
+a
+const a = await depcomp();
+a
+depcomp().then((a)=>console.log(a) );
+compound.toString()
+compound.toString
+compound.toLocaleString()
+compound.toLocaleString
+compound.domain
+compound.contract
+compound.Contract
+compound.valueOf()
+compound.valueOf().interface
+compound.valueOf().address
+compound.valueOf()
+compound.valueOf
+compound
+compound.interface
+compound.Promise
+compound
+compound.address
+buidler.web3
+let compound = depcomp();
+let counter = depcount();
+async function depcount() {return await waffle.deployContract(wallet, CounterArtifact); }
+async function depcomp() {return await waffle.deployContract(wallet, CompoundArtifact); }
+let [wallet] = buidler.waffle.provider.getWallets();
+let CounterArtifact = require("../artifacts/Counter.json");
+let CompoundArtifact = require("../artifacts/Compound.json");
+let buidler = require("@nomiclabs/buidler");
+let waffle = require("ethereum-waffle");
+let compound = depcomp();
+let counter = depcount();
+async function depcount() {return await waffle.deployContract(wallet, CounterArtifact); }
+async function depcomp() {return await waffle.deployContract(wallet, CompoundArtifact); }
+let [wallet] = buidler.waffle.provider.getWallets();
+let CounterArtifact = require("../artifacts/Counter.json");
+let CompoundArtifact = require("../artifacts/Compound.json");
+let buidler = require("@nomiclabs/buidler");
+let waffle = require("ethereum-waffle");
+let Compound = require("../typechain/Compound");
+compound
+let compound = main();
+async function main() {return await waffle.deployContract(wallet, CompoundArtifact); }
+CompoundArtifact
+wallet
+let [wallet] = buidler.waffle.provider.getWallets();
+buidler.waffle.provider.getWallets()
+buidler.waffle.provider
+buidler.waffle
+buidler.provider
+buidler
+let buidler = require("@nomiclabs/buidler");
+let buidler = require(""@nomiclabs/buidler");
+waffle.waffle
+waffle
+waffle.wallet
+let Compound = require("../typechain/Compound");
+CompoundArtifact
+let CompoundArtifact = require("../artifacts/Compound.json");
+let waffle = require("ethereum-waffle");
+async function main() {compound = await waffle.deployContract(waffle.wallet, CompoundArtifact); return compound}
+let CompoundArtifact = require("../artifacts/Compound.json");
+let waffle = require("ethereum-waffle");
+async function main() {compound = await waffle.deployContract(wallet, CompoundArtifact); return compound}
+waffle
+let waffle = require("ethereum-waffle");
+import "ethereum-waffle";
+import { deployContract, solidity } from "ethereum-waffle";
+compound = main()
+async function main() {compound = await deployContract(wallet, CompoundArtifact); return compound}
+async function main() => {compound = await deployContract(wallet, CompoundArtifact); return compound}
+function main() async => {compound = await deployContract(wallet, CompoundArtifact); return compound}
+async main() => {compound = await deployContract(wallet, CompoundArtifact); return compound}
+async () => {compound = await deployContract(wallet, CompoundArtifact); return compound}
+compound
+compound = async () => {compound = await deployContract(wallet, CompoundArtifact); return compound}
+let compound = async () => {compound = await deployContract(wallet, CompoundArtifact); return compound}
+compound
+compound.address
+async () => {compound = await deployContract(wallet, CompoundArtifact)}
+    compound = await deployContract(wallet, CompoundArtifact)}
+    counter = await deployContract(wallet, CounterArtifact) as Counter;
+async () => {
+    counter = await deployContract(wallet, CounterArtifact)}
+async () => {
+  }
+    const initialCount = await counter.getCount();
+    compound = await deployContract(wallet, CompoundArtifact) as Compound;
+    counter = await deployContract(wallet, CounterArtifact) as Counter;
+async () => {
+  }
+    expect(counter.address).to.properAddress;
+    expect(initialCount).to.eq(0);
+    // 4
+    const initialCount = await counter.getCount();
+    compound = await deployContract(wallet, CompoundArtifact) as Compound;
+    counter = await deployContract(wallet, CounterArtifact) as Counter;
+async () => {
+compound = await deployContract(wallet, CompoundArtifact) as Compound;
+let compound
+Counter counter;
+let counter
+await counter.proxy(compound.address, callData);
+  let compound: Compound;
+import { Compound } from "../typechain/Compound";
+import CompoundArtifact from "../artifacts/Compound.json";
+call()
+call
+Counter
+counter
+test
+run
+buidler.run
+help
