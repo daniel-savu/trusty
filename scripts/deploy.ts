@@ -1,17 +1,19 @@
 import { ethers } from "@nomiclabs/buidler";
 
+async function deployContract(name: string) {
+  console.log("----------------- deploying " + name + " -----------------")
+  const factory = await ethers.getContract(name);
+  let contract = await factory.deploy();
+  console.log("Deploy Transaction hash: " + contract.deployTransaction.hash);
+  await contract.deployed();
+  console.log("Contract address: " + contract.address);
+  console.log("");
+}
+
 async function main() {
-    const factory = await ethers.getContract("Counter");
-    // If we had constructor arguments, they would be passed into deploy()
-    let contract = await factory.deploy();
-    // The address the Contract WILL have once mined
-    console.log(contract.address);
-    // The transaction that was sent to the network to deploy the Contract
-    console.log(contract.deployTransaction.hash);
-    // The contract is NOT deployed yet; we must wait until it is mined
-    await contract.deployed();
-    console.log(contract.address)
-  }
+  await deployContract("LTCR");
+  await deployContract("trusty");
+}
   
   main()
     .then(() => process.exit(0))

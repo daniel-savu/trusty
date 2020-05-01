@@ -14,54 +14,16 @@ interface LTCRInterface extends Interface {
   functions: {
     curate: TypedFunctionDescription<{ encode([]: []): string }>;
 
-    getAgentCollateral: TypedFunctionDescription<{
-      encode([agent]: [string]): string;
-    }>;
-
-    getAgentFactor: TypedFunctionDescription<{
-      encode([agent]: [string]): string;
+    getReward: TypedFunctionDescription<{
+      encode([action]: [BigNumberish]): string;
     }>;
 
     getAssignment: TypedFunctionDescription<{
       encode([agent]: [string]): string;
     }>;
 
-    getBounds: TypedFunctionDescription<{
-      encode([layer]: [BigNumberish]): string;
-    }>;
-
-    getFactor: TypedFunctionDescription<{
-      encode([layer]: [BigNumberish]): string;
-    }>;
-
-    getLayers: TypedFunctionDescription<{ encode([]: []): string }>;
-
-    getReward: TypedFunctionDescription<{
-      encode([action]: [BigNumberish]): string;
-    }>;
-
-    getScore: TypedFunctionDescription<{ encode([agent]: [string]): string }>;
-
-    initialize: TypedFunctionDescription<{
-      encode([sender]: [string]): string;
-    }>;
-
-    isOwner: TypedFunctionDescription<{ encode([]: []): string }>;
-
-    owner: TypedFunctionDescription<{ encode([]: []): string }>;
-
     registerAgent: TypedFunctionDescription<{
       encode([agent, collateral]: [string, BigNumberish]): string;
-    }>;
-
-    renounceOwnership: TypedFunctionDescription<{ encode([]: []): string }>;
-
-    setBounds: TypedFunctionDescription<{
-      encode([layer, lower, upper]: [
-        BigNumberish,
-        BigNumberish,
-        BigNumberish
-      ]): string;
     }>;
 
     setCollateral: TypedFunctionDescription<{
@@ -72,37 +34,64 @@ interface LTCRInterface extends Interface {
       encode([layer, factor]: [BigNumberish, BigNumberish]): string;
     }>;
 
-    setLayers: TypedFunctionDescription<{
-      encode([layers]: [BigNumberish[]]): string;
+    renounceOwnership: TypedFunctionDescription<{ encode([]: []): string }>;
+
+    owner: TypedFunctionDescription<{ encode([]: []): string }>;
+
+    isOwner: TypedFunctionDescription<{ encode([]: []): string }>;
+
+    setBounds: TypedFunctionDescription<{
+      encode([layer, lower, upper]: [
+        BigNumberish,
+        BigNumberish,
+        BigNumberish
+      ]): string;
+    }>;
+
+    getAgentFactor: TypedFunctionDescription<{
+      encode([agent]: [string]): string;
+    }>;
+
+    update: TypedFunctionDescription<{
+      encode([agent, action]: [string, BigNumberish]): string;
     }>;
 
     setReward: TypedFunctionDescription<{
       encode([action, reward]: [BigNumberish, BigNumberish]): string;
     }>;
 
-    transferOwnership: TypedFunctionDescription<{
-      encode([newOwner]: [string]): string;
+    setLayers: TypedFunctionDescription<{
+      encode([layers]: [BigNumberish[]]): string;
     }>;
 
-    update: TypedFunctionDescription<{
-      encode([agent, action]: [string, BigNumberish]): string;
+    getBounds: TypedFunctionDescription<{
+      encode([layer]: [BigNumberish]): string;
+    }>;
+
+    getLayers: TypedFunctionDescription<{ encode([]: []): string }>;
+
+    getAgentCollateral: TypedFunctionDescription<{
+      encode([agent]: [string]): string;
+    }>;
+
+    initialize: TypedFunctionDescription<{
+      encode([sender]: [string]): string;
+    }>;
+
+    getScore: TypedFunctionDescription<{ encode([agent]: [string]): string }>;
+
+    getFactor: TypedFunctionDescription<{
+      encode([layer]: [BigNumberish]): string;
+    }>;
+
+    transferOwnership: TypedFunctionDescription<{
+      encode([newOwner]: [string]): string;
     }>;
   };
 
   events: {
-    Curate: TypedEventDescription<{
-      encodeTopics([round, start, end]: [null, null, null]): string[];
-    }>;
-
     NewBound: TypedEventDescription<{
       encodeTopics([lower, upper]: [null, null]): string[];
-    }>;
-
-    OwnershipTransferred: TypedEventDescription<{
-      encodeTopics([previousOwner, newOwner]: [
-        string | null,
-        string | null
-      ]): string[];
     }>;
 
     RegisterAgent: TypedEventDescription<{
@@ -111,6 +100,17 @@ interface LTCRInterface extends Interface {
 
     Update: TypedEventDescription<{
       encodeTopics([agent, reward, score]: [null, null, null]): string[];
+    }>;
+
+    Curate: TypedEventDescription<{
+      encodeTopics([round, start, end]: [null, null, null]): string[];
+    }>;
+
+    OwnershipTransferred: TypedEventDescription<{
+      encodeTopics([previousOwner, newOwner]: [
+        string | null,
+        string | null
+      ]): string[];
     }>;
   };
 }
@@ -131,50 +131,13 @@ export class LTCR extends Contract {
   functions: {
     curate(overrides?: TransactionOverrides): Promise<ContractTransaction>;
 
-    getAgentCollateral(agent: string): Promise<BigNumber>;
-
-    getAgentFactor(agent: string): Promise<BigNumber>;
-
-    getAssignment(agent: string): Promise<number>;
-
-    getBounds(
-      layer: BigNumberish
-    ): Promise<{
-      0: BigNumber;
-      1: BigNumber;
-    }>;
-
-    getFactor(layer: BigNumberish): Promise<BigNumber>;
-
-    getLayers(): Promise<number[]>;
-
     getReward(action: BigNumberish): Promise<BigNumber>;
 
-    getScore(agent: string): Promise<BigNumber>;
-
-    initialize(
-      sender: string,
-      overrides?: TransactionOverrides
-    ): Promise<ContractTransaction>;
-
-    isOwner(): Promise<boolean>;
-
-    owner(): Promise<string>;
+    getAssignment(agent: string): Promise<number>;
 
     registerAgent(
       agent: string,
       collateral: BigNumberish,
-      overrides?: TransactionOverrides
-    ): Promise<ContractTransaction>;
-
-    renounceOwnership(
-      overrides?: TransactionOverrides
-    ): Promise<ContractTransaction>;
-
-    setBounds(
-      layer: BigNumberish,
-      lower: BigNumberish,
-      upper: BigNumberish,
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
 
@@ -189,8 +152,26 @@ export class LTCR extends Contract {
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
 
-    setLayers(
-      layers: BigNumberish[],
+    renounceOwnership(
+      overrides?: TransactionOverrides
+    ): Promise<ContractTransaction>;
+
+    owner(): Promise<string>;
+
+    isOwner(): Promise<boolean>;
+
+    setBounds(
+      layer: BigNumberish,
+      lower: BigNumberish,
+      upper: BigNumberish,
+      overrides?: TransactionOverrides
+    ): Promise<ContractTransaction>;
+
+    getAgentFactor(agent: string): Promise<BigNumber>;
+
+    update(
+      agent: string,
+      action: BigNumberish,
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
 
@@ -200,64 +181,46 @@ export class LTCR extends Contract {
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
 
-    transferOwnership(
-      newOwner: string,
+    setLayers(
+      layers: BigNumberish[],
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
 
-    update(
-      agent: string,
-      action: BigNumberish,
+    getBounds(
+      layer: BigNumberish
+    ): Promise<{
+      0: BigNumber;
+      1: BigNumber;
+    }>;
+
+    getLayers(): Promise<number[]>;
+
+    getAgentCollateral(agent: string): Promise<BigNumber>;
+
+    initialize(
+      sender: string,
+      overrides?: TransactionOverrides
+    ): Promise<ContractTransaction>;
+
+    getScore(agent: string): Promise<BigNumber>;
+
+    getFactor(layer: BigNumberish): Promise<BigNumber>;
+
+    transferOwnership(
+      newOwner: string,
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
   };
 
   curate(overrides?: TransactionOverrides): Promise<ContractTransaction>;
 
-  getAgentCollateral(agent: string): Promise<BigNumber>;
-
-  getAgentFactor(agent: string): Promise<BigNumber>;
-
-  getAssignment(agent: string): Promise<number>;
-
-  getBounds(
-    layer: BigNumberish
-  ): Promise<{
-    0: BigNumber;
-    1: BigNumber;
-  }>;
-
-  getFactor(layer: BigNumberish): Promise<BigNumber>;
-
-  getLayers(): Promise<number[]>;
-
   getReward(action: BigNumberish): Promise<BigNumber>;
 
-  getScore(agent: string): Promise<BigNumber>;
-
-  initialize(
-    sender: string,
-    overrides?: TransactionOverrides
-  ): Promise<ContractTransaction>;
-
-  isOwner(): Promise<boolean>;
-
-  owner(): Promise<string>;
+  getAssignment(agent: string): Promise<number>;
 
   registerAgent(
     agent: string,
     collateral: BigNumberish,
-    overrides?: TransactionOverrides
-  ): Promise<ContractTransaction>;
-
-  renounceOwnership(
-    overrides?: TransactionOverrides
-  ): Promise<ContractTransaction>;
-
-  setBounds(
-    layer: BigNumberish,
-    lower: BigNumberish,
-    upper: BigNumberish,
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
@@ -272,8 +235,26 @@ export class LTCR extends Contract {
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
-  setLayers(
-    layers: BigNumberish[],
+  renounceOwnership(
+    overrides?: TransactionOverrides
+  ): Promise<ContractTransaction>;
+
+  owner(): Promise<string>;
+
+  isOwner(): Promise<boolean>;
+
+  setBounds(
+    layer: BigNumberish,
+    lower: BigNumberish,
+    upper: BigNumberish,
+    overrides?: TransactionOverrides
+  ): Promise<ContractTransaction>;
+
+  getAgentFactor(agent: string): Promise<BigNumber>;
+
+  update(
+    agent: string,
+    action: BigNumberish,
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
@@ -283,60 +264,69 @@ export class LTCR extends Contract {
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
+  setLayers(
+    layers: BigNumberish[],
+    overrides?: TransactionOverrides
+  ): Promise<ContractTransaction>;
+
+  getBounds(
+    layer: BigNumberish
+  ): Promise<{
+    0: BigNumber;
+    1: BigNumber;
+  }>;
+
+  getLayers(): Promise<number[]>;
+
+  getAgentCollateral(agent: string): Promise<BigNumber>;
+
+  initialize(
+    sender: string,
+    overrides?: TransactionOverrides
+  ): Promise<ContractTransaction>;
+
+  getScore(agent: string): Promise<BigNumber>;
+
+  getFactor(layer: BigNumberish): Promise<BigNumber>;
+
   transferOwnership(
     newOwner: string,
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
-  update(
-    agent: string,
-    action: BigNumberish,
-    overrides?: TransactionOverrides
-  ): Promise<ContractTransaction>;
-
   filters: {
-    Curate(round: null, start: null, end: null): EventFilter;
-
     NewBound(lower: null, upper: null): EventFilter;
+
+    RegisterAgent(agent: null, collateral: null): EventFilter;
+
+    Update(agent: null, reward: null, score: null): EventFilter;
+
+    Curate(round: null, start: null, end: null): EventFilter;
 
     OwnershipTransferred(
       previousOwner: string | null,
       newOwner: string | null
     ): EventFilter;
-
-    RegisterAgent(agent: null, collateral: null): EventFilter;
-
-    Update(agent: null, reward: null, score: null): EventFilter;
   };
 
   estimate: {
     curate(): Promise<BigNumber>;
 
-    getAgentCollateral(agent: string): Promise<BigNumber>;
-
-    getAgentFactor(agent: string): Promise<BigNumber>;
+    getReward(action: BigNumberish): Promise<BigNumber>;
 
     getAssignment(agent: string): Promise<BigNumber>;
 
-    getBounds(layer: BigNumberish): Promise<BigNumber>;
+    registerAgent(agent: string, collateral: BigNumberish): Promise<BigNumber>;
 
-    getFactor(layer: BigNumberish): Promise<BigNumber>;
+    setCollateral(mincollateral: BigNumberish): Promise<BigNumber>;
 
-    getLayers(): Promise<BigNumber>;
+    setFactor(layer: BigNumberish, factor: BigNumberish): Promise<BigNumber>;
 
-    getReward(action: BigNumberish): Promise<BigNumber>;
-
-    getScore(agent: string): Promise<BigNumber>;
-
-    initialize(sender: string): Promise<BigNumber>;
-
-    isOwner(): Promise<BigNumber>;
+    renounceOwnership(): Promise<BigNumber>;
 
     owner(): Promise<BigNumber>;
 
-    registerAgent(agent: string, collateral: BigNumberish): Promise<BigNumber>;
-
-    renounceOwnership(): Promise<BigNumber>;
+    isOwner(): Promise<BigNumber>;
 
     setBounds(
       layer: BigNumberish,
@@ -344,16 +334,26 @@ export class LTCR extends Contract {
       upper: BigNumberish
     ): Promise<BigNumber>;
 
-    setCollateral(mincollateral: BigNumberish): Promise<BigNumber>;
+    getAgentFactor(agent: string): Promise<BigNumber>;
 
-    setFactor(layer: BigNumberish, factor: BigNumberish): Promise<BigNumber>;
-
-    setLayers(layers: BigNumberish[]): Promise<BigNumber>;
+    update(agent: string, action: BigNumberish): Promise<BigNumber>;
 
     setReward(action: BigNumberish, reward: BigNumberish): Promise<BigNumber>;
 
-    transferOwnership(newOwner: string): Promise<BigNumber>;
+    setLayers(layers: BigNumberish[]): Promise<BigNumber>;
 
-    update(agent: string, action: BigNumberish): Promise<BigNumber>;
+    getBounds(layer: BigNumberish): Promise<BigNumber>;
+
+    getLayers(): Promise<BigNumber>;
+
+    getAgentCollateral(agent: string): Promise<BigNumber>;
+
+    initialize(sender: string): Promise<BigNumber>;
+
+    getScore(agent: string): Promise<BigNumber>;
+
+    getFactor(layer: BigNumberish): Promise<BigNumber>;
+
+    transferOwnership(newOwner: string): Promise<BigNumber>;
   };
 }

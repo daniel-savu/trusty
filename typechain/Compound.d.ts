@@ -34,10 +34,18 @@ export class Compound extends Contract {
   interface: CompoundInterface;
 
   functions: {
-    sum(a: BigNumberish, b: BigNumberish): Promise<BigNumber>;
+    sum(
+      a: BigNumberish,
+      b: BigNumberish,
+      overrides?: TransactionOverrides
+    ): Promise<ContractTransaction>;
   };
 
-  sum(a: BigNumberish, b: BigNumberish): Promise<BigNumber>;
+  sum(
+    a: BigNumberish,
+    b: BigNumberish,
+    overrides?: TransactionOverrides
+  ): Promise<ContractTransaction>;
 
   filters: {};
 

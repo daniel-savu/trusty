@@ -12,15 +12,15 @@ import {
 
 interface OwnableInterface extends Interface {
   functions: {
-    initialize: TypedFunctionDescription<{
-      encode([sender]: [string]): string;
-    }>;
-
-    isOwner: TypedFunctionDescription<{ encode([]: []): string }>;
+    renounceOwnership: TypedFunctionDescription<{ encode([]: []): string }>;
 
     owner: TypedFunctionDescription<{ encode([]: []): string }>;
 
-    renounceOwnership: TypedFunctionDescription<{ encode([]: []): string }>;
+    isOwner: TypedFunctionDescription<{ encode([]: []): string }>;
+
+    initialize: TypedFunctionDescription<{
+      encode([sender]: [string]): string;
+    }>;
 
     transferOwnership: TypedFunctionDescription<{
       encode([newOwner]: [string]): string;
@@ -51,16 +51,16 @@ export class Ownable extends Contract {
   interface: OwnableInterface;
 
   functions: {
-    initialize(
-      sender: string,
+    renounceOwnership(
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
 
-    isOwner(): Promise<boolean>;
-
     owner(): Promise<string>;
 
-    renounceOwnership(
+    isOwner(): Promise<boolean>;
+
+    initialize(
+      sender: string,
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
 
@@ -70,16 +70,16 @@ export class Ownable extends Contract {
     ): Promise<ContractTransaction>;
   };
 
-  initialize(
-    sender: string,
+  renounceOwnership(
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
-  isOwner(): Promise<boolean>;
-
   owner(): Promise<string>;
 
-  renounceOwnership(
+  isOwner(): Promise<boolean>;
+
+  initialize(
+    sender: string,
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
@@ -96,13 +96,13 @@ export class Ownable extends Contract {
   };
 
   estimate: {
-    initialize(sender: string): Promise<BigNumber>;
-
-    isOwner(): Promise<BigNumber>;
+    renounceOwnership(): Promise<BigNumber>;
 
     owner(): Promise<BigNumber>;
 
-    renounceOwnership(): Promise<BigNumber>;
+    isOwner(): Promise<BigNumber>;
+
+    initialize(sender: string): Promise<BigNumber>;
 
     transferOwnership(newOwner: string): Promise<BigNumber>;
   };

@@ -1,4 +1,4 @@
-pragma solidity 0.6.2;
+pragma solidity ^0.5.0;
 import "@nomiclabs/buidler/console.sol";
 
 contract Compound {
@@ -12,25 +12,20 @@ contract Compound {
     console.log(callDataSize);
     console.log(address(this));
     console.logBytes(msg.data);
-
-    // bytes memory msgdata;
-    // assembly {
-    //   calldatacopy(msgdata, 0, calldatasize())
-    // }
-    // console.logBytes(msgdata);
     return a + b;
   }
 
-  fallback() payable external {
-    console.log("\nCompound_fb");
-    uint256 callDataSize;
-    bytes memory msgdata;
-    assembly {
-      callDataSize := calldatasize()
-      calldatacopy(msgdata, 0, calldatasize())
-    }
-    console.log(callDataSize);
-    console.logBytes(msgdata);
-  }
+  // fallback() payable external {
+  //   console.log("\nCompound_fb");
+  //   // uint256 callDataSize;
+  //   // bytes memory msgdata;
+  //   // assembly {
+  //   //   callDataSize := calldatasize()
+  //   //   calldatacopy(msgdata, 0, calldatasize())
+  //   // }
+  //   // console.log(callDataSize);
+  //   // console.logBytes(msgdata);
+  //   console.logBytes(msg.data);
+  // }
 
 }

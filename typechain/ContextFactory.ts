@@ -18,6 +18,7 @@ export class ContextFactory {
 const _abi = [
   {
     inputs: [],
+    payable: false,
     stateMutability: "nonpayable",
     type: "constructor"
   }

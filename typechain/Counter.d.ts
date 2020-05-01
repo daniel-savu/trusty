@@ -12,18 +12,18 @@ import {
 
 interface CounterInterface extends Interface {
   functions: {
+    countUp: TypedFunctionDescription<{ encode([]: []): string }>;
+
     args: TypedFunctionDescription<{
       encode([x, y]: [BigNumberish, BigNumberish]): string;
     }>;
 
     countDown: TypedFunctionDescription<{ encode([]: []): string }>;
 
-    countUp: TypedFunctionDescription<{ encode([]: []): string }>;
-
     getCount: TypedFunctionDescription<{ encode([]: []): string }>;
 
     proxy: TypedFunctionDescription<{
-      encode([implementation, callData]: [string, Arrayish]): string;
+      encode([implementation, params]: [string, Arrayish]): string;
     }>;
   };
 
@@ -48,6 +48,8 @@ export class Counter extends Contract {
   interface: CounterInterface;
 
   functions: {
+    countUp(overrides?: TransactionOverrides): Promise<ContractTransaction>;
+
     args(
       x: BigNumberish,
       y: BigNumberish,
@@ -56,16 +58,16 @@ export class Counter extends Contract {
 
     countDown(overrides?: TransactionOverrides): Promise<ContractTransaction>;
 
-    countUp(overrides?: TransactionOverrides): Promise<ContractTransaction>;
-
     getCount(): Promise<BigNumber>;
 
     proxy(
       implementation: string,
-      callData: Arrayish,
+      params: Arrayish,
       overrides?: TransactionOverrides
     ): Promise<ContractTransaction>;
   };
+
+  countUp(overrides?: TransactionOverrides): Promise<ContractTransaction>;
 
   args(
     x: BigNumberish,
@@ -75,13 +77,11 @@ export class Counter extends Contract {
 
   countDown(overrides?: TransactionOverrides): Promise<ContractTransaction>;
 
-  countUp(overrides?: TransactionOverrides): Promise<ContractTransaction>;
-
   getCount(): Promise<BigNumber>;
 
   proxy(
     implementation: string,
-    callData: Arrayish,
+    params: Arrayish,
     overrides?: TransactionOverrides
   ): Promise<ContractTransaction>;
 
@@ -90,14 +90,14 @@ export class Counter extends Contract {
   };
 
   estimate: {
+    countUp(): Promise<BigNumber>;
+
     args(x: BigNumberish, y: BigNumberish): Promise<BigNumber>;
 
     countDown(): Promise<BigNumber>;
 
-    countUp(): Promise<BigNumber>;
-
     getCount(): Promise<BigNumber>;
 
-    proxy(implementation: string, callData: Arrayish): Promise<BigNumber>;
+    proxy(implementation: string, params: Arrayish): Promise<BigNumber>;
   };
 }
