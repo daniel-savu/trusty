@@ -9,13 +9,15 @@ import CompoundArtifact from '../artifacts/Compound.json'
 import { Compound } from "../typechain/Compound";
 
 import { ContractTransaction, ethers } from "ethers";
+import path from "path";
 
 chai.use(solidity);
 const { expect } = chai;
 
 function getABI(filename: string) {
   var fs = require('fs');
-  var jsonFile = "/Users/dani/dani/Pro/facultate/Master/Term_3_Dissertation/protocol-integrations/build/contracts/" + filename;
+  var jsonFile = path.normalize(__dirname + "/../build/contracts/" + filename);
+  console.log(jsonFile);
   var parsed= JSON.parse(fs.readFileSync(jsonFile));
   var abi = parsed.abi;
   return abi;
