@@ -58,7 +58,7 @@ config_1.task("balance", "Prints an account's balance")
         }
     });
 }); });
-var INFURA_API_KEY = "196529cd95964f0fb409a840238d1038";
+var INFURA_API_KEY = "***REMOVED***";
 var LOCAL_NETWORK_PRIVATE_KEY = "0x710fd8db1b881e948e291d85ebde38829f774c79d99b775f88c99cbe3f4649c1";
 var config = {
     defaultNetwork: "buidlerevm",
