@@ -53,7 +53,7 @@ contract trusty_compound {
 
     function mint() public payable {
         // address agent = msg.sender;
-        ICEther(CEtherAddress).mint.value(msg.value)();
+        CEtherAddress.call.value(msg.value)(abi.encodeWithSignature("mint()"));
     }
 
     function balanceOfUnderlying() public returns (uint) {

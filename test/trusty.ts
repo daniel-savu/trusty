@@ -21,6 +21,12 @@ contract("trusty_compound", accounts => {
     ];
     const compoundCEthContract = new web3.eth.Contract(abiJson, contractAddress);
 
+    const supplyRatePerBlockMantissa = await compoundCEthContract.methods.
+    supplyRatePerBlock().call()
+    const interestPerEthThisBlock = supplyRatePerBlockMantissa / 1e18;
+    console.log(`Each supplied ETH will increase by ${interestPerEthThisBlock}` +
+    ` this block, based on the current interest rate.`)
+
     console.log('Supplying ETH to the Compound Protocol...');
     // Mint some cETH by supplying ETH to the Compound Protocol
     await tc.mint({
@@ -74,7 +80,7 @@ contract("Compound", accounts => {
     const compoundCEthContract = new web3.eth.Contract(abiJson, contractAddress);
     const supplyRatePerBlockMantissa = await compoundCEthContract.methods.
       supplyRatePerBlock().call()
-    const interestPerEthThisBlock = supplyRatePerBlockMantissa / 1e18
+    const interestPerEthThisBlock = supplyRatePerBlockMantissa / 1e18;
     console.log(`Each supplied ETH will increase by ${interestPerEthThisBlock}` +
       ` this block, based on the current interest rate.`)
   
@@ -106,8 +112,6 @@ contract("Compound", accounts => {
     console.log("Current exchange rate from cETH to ETH:", exchangeRateCurrent);
 
     console.log('Redeeming the cETH for ETH...');
-
-    console.log('Exchanging all cETH based on cToken amount...');
     await compoundCEthContract.methods.redeem(cTokenBalance * 1e8).send({
       from: myWalletAddress,
       gasLimit: web3.utils.toHex(150000),      // posted at compound.finance/developers#gas-costs
