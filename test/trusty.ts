@@ -62,7 +62,7 @@ contract("trusty_compound", accounts => {
 
     cTokenBalance = await compoundCEthContract.methods.balanceOf(tc.address).call();
     cTokenBalance = (cTokenBalance / 1e8);
-    console.log("My wallet's cETH Token Balance:", cTokenBalance);
+    console.log("trusty's cETH Token Balance:", cTokenBalance);
 
   });
 });
