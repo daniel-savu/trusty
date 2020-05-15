@@ -1,10 +1,10 @@
 pragma solidity ^0.5.0;
 
-import "@openzeppelin/contracts-ethereum-package/contracts/ownership/Ownable.sol";
+// import "@openzeppelin/contracts-ethereum-package/contracts/ownership/Ownable.sol";
 import "@nomiclabs/buidler/console.sol";
 
 
-contract LTCR is Ownable {
+contract LTCR {
     uint256 _minCollateral; // minimum collateral
     uint256 _decimals; // decimals to calculate collateral factor
 
@@ -211,7 +211,8 @@ contract LTCR is Ownable {
 
     event Update(address agent, uint256 reward, uint256 score);
 
-    function curate() public onlyOwner returns (bool) {
+    // function curate() public onlyOwner returns (bool) {
+    function curate() public returns (bool) {
         require(_start != 0, "period not started");
         require(block.number >= _end, "period not ended");
 

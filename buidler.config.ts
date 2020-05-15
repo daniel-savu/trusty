@@ -1,42 +1,37 @@
-import { BuidlerConfig, usePlugin, task } from "@nomiclabs/buidler/config";
+import { BuidlerConfig, task, usePlugin } from "@nomiclabs/buidler/config";
 
 usePlugin("@nomiclabs/buidler-waffle");
-usePlugin("@nomiclabs/buidler-etherscan");
-usePlugin("buidler-typechain");
 usePlugin("@nomiclabs/buidler-web3");
-// usePlugin('tasks');
+usePlugin("@nomiclabs/buidler-truffle5");
+usePlugin("@nomiclabs/buidler-waffle");
 
-task("balance", "Prints an account's balance")
-  .addParam("account", "The account's address")
-  .setAction(async (taskArgs: { account: any; }, bre) => {
-    const account = bre.web3.utils.toChecksumAddress(taskArgs.account);
-    const balance = await bre.web3.eth.getBalance(account);
+// This is a sample Buidler task. To learn how to create your own go to
+// https://buidler.dev/guides/create-task.html
+task("accounts", "Prints the list of accounts", async (taskArgs, bre) => {
+  const accounts = await bre.ethers.getSigners();
 
-    console.log(bre.web3.utils.fromWei(balance, "ether"), "ETH");
-  });
-
-
+  for (const account of accounts) {
+    console.log(await account.getAddress());
+  }
+});
 
 
 const LOCAL_NETWORK_PRIVATE_KEY = "0x710fd8db1b881e948e291d85ebde38829f774c79d99b775f88c99cbe3f4649c1";
 const config: BuidlerConfig = {
   defaultNetwork: "buidlerevm",
   solc: {
-    version: "0.5.0"
+    version: "0.5.16"
   },
   networks: {
     localhost: {
       url: `http://127.0.0.1:2000`,
       accounts: [LOCAL_NETWORK_PRIVATE_KEY]
     },
-    evm: {
-      url: `http://127.0.0.1:8545`,
-      accounts: [`0xc5e8f61d1ab959b397eecc0a37a6517b8e67a0e7cf1f4bce5591f3ed80199122`]
+    infura: {
+      url: `http://127.0.0.1:2000`,
+      accounts: [`0x01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548`],
+      blockGasLimit: 16000000000
     },
-  },
-  typechain: {
-    outDir: "typechain",
-    target: "ethers"
   }
 };
 
