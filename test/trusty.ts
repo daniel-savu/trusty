@@ -9,7 +9,7 @@ const trusty_compound = artifacts.require("trusty_compound");
 
 
 contract("trusty_compound", accounts => {
-  it("Should call trusty_compound", async function() {
+  it("Should call Compound through trusty_compound", async function() {
     const tc = await trusty_compound.new();
     const privateKey = "01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548";
     web3.eth.accounts.wallet.add('0x' + privateKey);
@@ -62,8 +62,8 @@ contract("trusty_compound", accounts => {
 });
 
 
-contract("compound", accounts => {
-  it("Should return the new greeting once it's changed", async function() {
+contract("Compound", accounts => {
+  it("Should call Compound directly from javascript", async function() {
     const privateKey = "01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548";
     web3.eth.accounts.wallet.add('0x' + privateKey);
     const myWalletAddress = web3.eth.accounts.wallet[0].address;
