@@ -20,7 +20,7 @@ const LOCAL_NETWORK_PRIVATE_KEY = "0x710fd8db1b881e948e291d85ebde38829f774c79d99
 const config: BuidlerConfig = {
   defaultNetwork: "buidlerevm",
   solc: {
-    version: "0.5.16"
+    version: "0.5.8"
   },
   networks: {
     localhost: {

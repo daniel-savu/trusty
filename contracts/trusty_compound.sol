@@ -65,7 +65,7 @@ contract trusty_compound {
     }
 
     function redeem(uint redeemTokens) public {
-        CEtherAddress.call(abi.encodeWithSignature("redeem(uint redeemTokens)", redeemTokens));
+        CEtherAddress.call(abi.encodeWithSignature("redeem(uint256)", redeemTokens));
     }
 
     function borrow(uint borrowAmount) public returns (uint) {

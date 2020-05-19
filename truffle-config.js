@@ -86,14 +86,14 @@ module.exports = {
   // Configure your compilers
   compilers: {
     solc: {
-      version: "0.5.16",
+      version: "0.5.8",
       // docker: true,
       settings: {
-      //  optimizer: {
-      //    enabled: false,
-      //    runs: 200
-      //  },
-       evmVersion: "istanbul"
+       optimizer: {
+         enabled: true,
+         runs: 200
+       },
+      //  evmVersion: "istanbul"
       }
     }
   }
