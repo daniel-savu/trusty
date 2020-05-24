@@ -24,6 +24,7 @@
     "chai": "^4.2.0",
     "ethereum-waffle": "^2.5.0",
     "ethers": "^4.0.47",
+    "openzeppelin-solidity": "^3.0.1",
     "ts-node": "^8.10.1",
     "typescript": "^3.9.2",
     "web3": "^1.2.7"

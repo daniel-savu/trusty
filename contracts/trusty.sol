@@ -10,7 +10,7 @@ contract trusty {
     address constant CEtherAddress = 0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5;
     // you have maps from a protocol name to Balance parameters
     
-    function protocolAlreadyAdded(string memory protocol) private returns(bool) {
+    function protocolAlreadyAdded(string memory protocol) view private returns(bool) {
         for (uint8 i = 0; i < _protocols.length; i++) {
             if(identicalStrings(_protocols[i], protocol)) {
                 return true;
@@ -19,7 +19,7 @@ contract trusty {
         return false;
     }
 
-    function identicalStrings(string memory a, string memory b) public returns(bool) {
+    function identicalStrings(string memory a, string memory b) pure public returns(bool) {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 

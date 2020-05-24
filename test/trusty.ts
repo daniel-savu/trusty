@@ -1,4 +1,11 @@
 import env = require("@nomiclabs/buidler");
+import CEtherABI from "./ABIs/CEther.json";
+import DaiTokenABI from "./ABIs/DAItoken.json";
+import LendingPoolAddressesProviderABI from "./ABIs/LendingPoolAddressesProvider.json";
+import LendingPoolABI from "./ABIs/LendingPool.json";
+import ATokenABI from "./ABIs/AToken.json"
+import { assert } from "console";
+
 
 var web3 = env.web3;
 var artifacts = env.artifacts;
@@ -6,20 +13,260 @@ var contract = env.contract;
 
 const trusty = artifacts.require("trusty");
 const trusty_compound = artifacts.require("trusty_compound");
+const trusty_aave = artifacts.require("trusty_aave");
+const FlashLoanExecutor = artifacts.require("FlashLoanExecutor");
+
+const privateKey = "01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548";
+web3.eth.accounts.wallet.add('0x' + privateKey);
+const myWalletAddress = web3.eth.accounts.wallet[0].address;
+
+contract("trusty_aave", accounts => {
+    const referralCode = '0'
+    const ethAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
+    const ethAmountInWei = web3.utils.toWei('1', 'ether')
+    const aETHToken = '0x3a3A65aAb0dd2A17E3F1947bA16138cd37d08c04'
+    const aETHContract = new web3.eth.Contract(ATokenABI, aETHToken)
+    const daiAddress = '0x6B175474E89094C44Da98b954EedeAC495271d0F' // mainnet
+    const daiAmountinWei = web3.utils.toWei("0.5", "gwei")
+    const interestRateMode = 2 // variable rate
+    const lpAddressProviderAddress = '0x24a42fD28C976A61Df5D00D0599C34c4f90748c8'
+    const lpAddressProviderContract = new web3.eth.Contract(LendingPoolAddressesProviderABI, lpAddressProviderAddress)
+
+    it("Should take an Aave flashloan using trusty", async function() {
+        this.timeout(1000000);
+        const ta = await trusty_aave.new();
+        const flr = await FlashLoanExecutor.new(lpAddressProviderContract.options.address);
+        let amount = web3.utils.toWei("100", "ether");
+        let params = "0x0";
+
+        let feeRate = 0.0009;
+        let fee = Number(amount) * feeRate;
+
+        // send enough funds to FlashLoanExecutor to pay the flashloan fee
+
+        await web3.eth.sendTransaction({
+            from: myWalletAddress,
+            to: flr.address,
+            value: web3.utils.toHex(fee),
+            gasLimit: web3.utils.toHex(150000),
+            gasPrice: web3.utils.toHex(20000000000),
+         });
+
+        var balance = await web3.eth.getBalance(flr.address); 
+        console.log(`Balance before the flashloan (0.09%): ${balance}`);
+        let tr = await ta.flashLoan(
+            flr.address, 
+            ethAddress, 
+            amount,
+            params,
+            {
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(150000),
+                gasPrice: web3.utils.toHex(20000000000),
+            }
+        );
+        balance = await web3.eth.getBalance(flr.address); 
+        console.log(`Balance after the flashloan         : ${balance}`);
+        assert(balance == 0);
+    });
+
+    it("Should call Aave from trusty", async function() {
+        this.timeout(1000000);
+
+        // Get the latest LendingPool contract address
+        const lpAddress = await lpAddressProviderContract.methods
+            .getLendingPool()
+            .call()
+            .catch((e: { message: any; }) => {
+                throw Error(`Error getting lendingPool address: ${e.message}`)
+            })
+
+        // Make the deposit transaction via LendingPool contract
+        const lpContract = new web3.eth.Contract(LendingPoolABI, lpAddress)
+
+        const ta = await trusty_aave.new();
+        console.log(`trusty_aave address: ${ta.address}`)
+        let tr = await ta.deposit(
+            ethAddress, 
+            ethAmountInWei, 
+            referralCode, 
+            {
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(150000),
+                gasPrice: web3.utils.toHex(20000000000),
+                value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
+            }
+        );
+        // console.log(tr.receipt.rawLogs);
+        console.log("Deposited 1 Ether")
+
+        // Borrowing Dai using the deposited Eth as collateral
+        tr = await ta.borrow(
+            daiAddress,
+            daiAmountinWei,
+            interestRateMode,
+            referralCode,
+            {
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(1500000),
+                gasPrice: web3.utils.toHex(20000000000)
+            }
+        );
+        console.log(`Borrowed ${daiAmountinWei} Dai amount in Wei`)
+        let d = await lpContract.methods.getUserAccountData(ta.address).call()
+        console.log(d);
+
+        // await delay(2000);
+        console.log(`Paying back ${daiAmountinWei} gwei`)
+        tr = await ta.repay(
+            daiAddress,
+            daiAmountinWei,
+            myWalletAddress,
+            {
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(15000000),
+                gasPrice: web3.utils.toHex(200000000000),
+            }
+        );
+        console.log("Repaid the borrow")
+        d = await lpContract.methods.getUserAccountData(ta.address).call()
+        console.log(d);
+
+        let balance = await aETHContract.methods.balanceOf(ta.address).call()
+        console.log(`Redeeming the balance of: ${balance}`)
+
+        tr = await ta.redeem(
+            aETHToken,
+            '-1',
+            {
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(15000000),
+                gasPrice: web3.utils.toHex(200000000000),
+            }
+        );
+        balance = await aETHContract.methods.balanceOf(ta.address).call()
+        console.log(`Balance left:             ${balance}`)
+        assert(balance == 0);
+    });
+
+    it("Should call Aave directly from javascript", async function() {
+        this.timeout(1000000);
+
+        // Get the latest LendingPool contract address
+        const lpAddress = await lpAddressProviderContract.methods
+            .getLendingPool()
+            .call()
+            .catch((e: { message: any; }) => {
+                throw Error(`Error getting lendingPool address: ${e.message}`)
+            })
+
+        // Make the deposit transaction via LendingPool contract
+        const lpContract = new web3.eth.Contract(LendingPoolABI, lpAddress)
+        console.log(lpAddress)
+
+        let tr = await lpContract.methods
+            .deposit(
+                ethAddress,
+                ethAmountInWei,
+                referralCode
+            )
+            .send({
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(1500000),
+                gasPrice: web3.utils.toHex(20000000000),
+                value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
+            })
+            .catch((e: { message: any; }) => {
+                throw Error(`Error depositing to the LendingPool contract: ${e.message}`)
+            })
+        // console.log(tr)
+        console.log("Deposited 1 Ether")
+
+        // Borrowing Dai using the deposited Eth as collateral
+
+        await lpContract.methods
+        .borrow(
+            daiAddress,
+            daiAmountinWei,
+            interestRateMode,
+            referralCode
+        )
+        .send({
+            from: myWalletAddress,
+            gasLimit: web3.utils.toHex(1500000),
+            gasPrice: web3.utils.toHex(20000000000)
+        })
+        .catch((e: { message: any; }) => {
+            throw Error(`Error with borrow() call to the LendingPool contract: ${e.message}`)
+        })
+
+        console.log(`Borrowed ${daiAmountinWei} Dai amount in Wei`)
+
+        let d = await lpContract.methods.getUserAccountData(myWalletAddress).call()
+        console.log(d);
+
+        // await delay(2000);
+
+        console.log(`Paying back ${daiAmountinWei} gwei`)
+
+        // Get the latest LendingPoolCore address
+        const lpCoreAddress = await lpAddressProviderContract.methods
+            .getLendingPoolCore()
+            .call()
+
+        // Approve the LendingPoolCore address with the DAI contract
+        const daiContract = new web3.eth.Contract(DaiTokenABI, daiAddress)
+        await daiContract.methods
+            .approve(
+                lpCoreAddress,
+                daiAmountinWei
+            )
+            .send({
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(15000000),
+                gasPrice: web3.utils.toHex(200000000000),
+            })
+
+        await lpContract.methods
+        .repay(
+            daiAddress,
+            daiAmountinWei,
+            myWalletAddress
+        )
+        .send({
+            from: myWalletAddress,
+            gasLimit: web3.utils.toHex(15000000),
+            gasPrice: web3.utils.toHex(200000000000),
+        })
+
+        console.log("Repaid the borrow")
+        d = await lpContract.methods.getUserAccountData(myWalletAddress).call()
+        console.log(d);
+
+        let balance = await aETHContract.methods.balanceOf(myWalletAddress).call()
+        console.log(`Redeeming the balance of: ${balance}`)
+        tr = await aETHContract.methods
+            .redeem(balance)
+            .send({
+                from: myWalletAddress,
+                gasLimit: web3.utils.toHex(15000000),
+                gasPrice: web3.utils.toHex(200000000000),
+            })
+
+        // console.log(tr)
+        balance = await aETHContract.methods.balanceOf(myWalletAddress).call()
+        console.log(`Balance left:             ${balance}`)
+        // There seems to be some slippage occuring
+    });
+});
 
 
 contract("trusty_compound", accounts => {
   it("Should call Compound through trusty_compound", async function() {
     const tc = await trusty_compound.new();
-    const privateKey = "01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548";
-    web3.eth.accounts.wallet.add('0x' + privateKey);
-    const myWalletAddress = web3.eth.accounts.wallet[0].address;
 
     const contractAddress = '0x4ddc2d193948926d02f9b1fe9e1daa0718270ed5';
-    const abiJson = [
-      {"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[],"name":"mint","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"reserveFactorMantissa","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"account","type":"address"}],"name":"borrowBalanceCurrent","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"exchangeRateStored","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"dst","type":"address"},{"name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"pendingAdmin","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOfUnderlying","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"getCash","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"newComptroller","type":"address"}],"name":"_setComptroller","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalBorrows","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"repayBorrow","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"comptroller","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"reduceAmount","type":"uint256"}],"name":"_reduceReserves","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"initialExchangeRateMantissa","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"accrualBlockNumber","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"totalBorrowsCurrent","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"redeemAmount","type":"uint256"}],"name":"redeemUnderlying","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalReserves","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"borrowBalanceStored","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"accrueInterest","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"borrowIndex","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"borrower","type":"address"},{"name":"cTokenCollateral","type":"address"}],"name":"liquidateBorrow","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"supplyRatePerBlock","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"liquidator","type":"address"},{"name":"borrower","type":"address"},{"name":"seizeTokens","type":"uint256"}],"name":"seize","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"newPendingAdmin","type":"address"}],"name":"_setPendingAdmin","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[],"name":"exchangeRateCurrent","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"getAccountSnapshot","outputs":[{"name":"","type":"uint256"},{"name":"","type":"uint256"},{"name":"","type":"uint256"},{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"borrowAmount","type":"uint256"}],"name":"borrow","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"redeemTokens","type":"uint256"}],"name":"redeem","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"owner","type":"address"},{"name":"spender","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"borrower","type":"address"}],"name":"repayBorrowBehalf","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":false,"inputs":[],"name":"_acceptAdmin","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"newInterestRateModel","type":"address"}],"name":"_setInterestRateModel","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"interestRateModel","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"admin","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"borrowRatePerBlock","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"newReserveFactorMantissa","type":"uint256"}],"name":"_setReserveFactor","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"isCToken","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[{"name":"comptroller_","type":"address"},{"name":"interestRateModel_","type":"address"},{"name":"initialExchangeRateMantissa_","type":"uint256"},{"name":"name_","type":"string"},{"name":"symbol_","type":"string"},{"name":"decimals_","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":false,"name":"interestAccumulated","type":"uint256"},{"indexed":false,"name":"borrowIndex","type":"uint256"},{"indexed":false,"name":"totalBorrows","type":"uint256"}],"name":"AccrueInterest","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"minter","type":"address"},{"indexed":false,"name":"mintAmount","type":"uint256"},{"indexed":false,"name":"mintTokens","type":"uint256"}],"name":"Mint","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"redeemer","type":"address"},{"indexed":false,"name":"redeemAmount","type":"uint256"},{"indexed":false,"name":"redeemTokens","type":"uint256"}],"name":"Redeem","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"borrower","type":"address"},{"indexed":false,"name":"borrowAmount","type":"uint256"},{"indexed":false,"name":"accountBorrows","type":"uint256"},{"indexed":false,"name":"totalBorrows","type":"uint256"}],"name":"Borrow","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"payer","type":"address"},{"indexed":false,"name":"borrower","type":"address"},{"indexed":false,"name":"repayAmount","type":"uint256"},{"indexed":false,"name":"accountBorrows","type":"uint256"},{"indexed":false,"name":"totalBorrows","type":"uint256"}],"name":"RepayBorrow","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"liquidator","type":"address"},{"indexed":false,"name":"borrower","type":"address"},{"indexed":false,"name":"repayAmount","type":"uint256"},{"indexed":false,"name":"cTokenCollateral","type":"address"},{"indexed":false,"name":"seizeTokens","type":"uint256"}],"name":"LiquidateBorrow","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldPendingAdmin","type":"address"},{"indexed":false,"name":"newPendingAdmin","type":"address"}],"name":"NewPendingAdmin","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldAdmin","type":"address"},{"indexed":false,"name":"newAdmin","type":"address"}],"name":"NewAdmin","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldComptroller","type":"address"},{"indexed":false,"name":"newComptroller","type":"address"}],"name":"NewComptroller","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldInterestRateModel","type":"address"},{"indexed":false,"name":"newInterestRateModel","type":"address"}],"name":"NewMarketInterestRateModel","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldReserveFactorMantissa","type":"uint256"},{"indexed":false,"name":"newReserveFactorMantissa","type":"uint256"}],"name":"NewReserveFactor","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"admin","type":"address"},{"indexed":false,"name":"reduceAmount","type":"uint256"},{"indexed":false,"name":"newTotalReserves","type":"uint256"}],"name":"ReservesReduced","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"error","type":"uint256"},{"indexed":false,"name":"info","type":"uint256"},{"indexed":false,"name":"detail","type":"uint256"}],"name":"Failure","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Approval","type":"event"}
-    ];
-    const compoundCEthContract = new web3.eth.Contract(abiJson, contractAddress);
+    const compoundCEthContract = new web3.eth.Contract(CEtherABI, contractAddress);
 
     const supplyRatePerBlockMantissa = await compoundCEthContract.methods.
     supplyRatePerBlock().call()
@@ -31,8 +278,8 @@ contract("trusty_compound", accounts => {
     // Mint some cETH by supplying ETH to the Compound Protocol
     await tc.mint({
       from: myWalletAddress,
-      gasLimit: web3.utils.toHex(150000),      // posted at compound.finance/developers#gas-costs
-      gasPrice: web3.utils.toHex(20000000000), // use ethgasstation.info (mainnet only)
+      gasLimit: web3.utils.toHex(150000),
+      gasPrice: web3.utils.toHex(20000000000),
       value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
     });
     console.log('cETH "Mint" operation successful.');
@@ -54,10 +301,10 @@ contract("trusty_compound", accounts => {
     console.log("Current exchange rate from cETH to ETH:", exchangeRateCurrent);
 
     console.log('Redeeming the cETH for ETH...');
-    await tc.redeem(cTokenBalance * 1e8, {
+    let tr = await tc.redeem(cTokenBalance * 1e8, {
       from: myWalletAddress,
-      gasLimit: web3.utils.toHex(150000),      // posted at compound.finance/developers#gas-costs
-      gasPrice: web3.utils.toHex(20000000000), // use ethgasstation.info (mainnet only)
+      gasLimit: web3.utils.toHex(1500000),
+      gasPrice: web3.utils.toHex(20000000000),
     });
 
     cTokenBalance = await compoundCEthContract.methods.balanceOf(tc.address).call();
@@ -70,14 +317,8 @@ contract("trusty_compound", accounts => {
 
 contract("Compound", accounts => {
   it("Should call Compound directly from javascript", async function() {
-    const privateKey = "01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548";
-    web3.eth.accounts.wallet.add('0x' + privateKey);
-    const myWalletAddress = web3.eth.accounts.wallet[0].address;
     const contractAddress = '0x4ddc2d193948926d02f9b1fe9e1daa0718270ed5';
-    const abiJson = [
-      {"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"spender","type":"address"},{"name":"amount","type":"uint256"}],"name":"approve","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[],"name":"mint","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"reserveFactorMantissa","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"account","type":"address"}],"name":"borrowBalanceCurrent","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"exchangeRateStored","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"src","type":"address"},{"name":"dst","type":"address"},{"name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"pendingAdmin","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOfUnderlying","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"getCash","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"newComptroller","type":"address"}],"name":"_setComptroller","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalBorrows","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"repayBorrow","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"comptroller","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"reduceAmount","type":"uint256"}],"name":"_reduceReserves","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"initialExchangeRateMantissa","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"accrualBlockNumber","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"totalBorrowsCurrent","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"redeemAmount","type":"uint256"}],"name":"redeemUnderlying","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalReserves","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"borrowBalanceStored","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[],"name":"accrueInterest","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"borrowIndex","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"borrower","type":"address"},{"name":"cTokenCollateral","type":"address"}],"name":"liquidateBorrow","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":true,"inputs":[],"name":"supplyRatePerBlock","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"liquidator","type":"address"},{"name":"borrower","type":"address"},{"name":"seizeTokens","type":"uint256"}],"name":"seize","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"newPendingAdmin","type":"address"}],"name":"_setPendingAdmin","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[],"name":"exchangeRateCurrent","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"account","type":"address"}],"name":"getAccountSnapshot","outputs":[{"name":"","type":"uint256"},{"name":"","type":"uint256"},{"name":"","type":"uint256"},{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"borrowAmount","type":"uint256"}],"name":"borrow","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"redeemTokens","type":"uint256"}],"name":"redeem","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"owner","type":"address"},{"name":"spender","type":"address"}],"name":"allowance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"borrower","type":"address"}],"name":"repayBorrowBehalf","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"constant":false,"inputs":[],"name":"_acceptAdmin","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"newInterestRateModel","type":"address"}],"name":"_setInterestRateModel","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"interestRateModel","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"admin","outputs":[{"name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"borrowRatePerBlock","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"newReserveFactorMantissa","type":"uint256"}],"name":"_setReserveFactor","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"isCToken","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[{"name":"comptroller_","type":"address"},{"name":"interestRateModel_","type":"address"},{"name":"initialExchangeRateMantissa_","type":"uint256"},{"name":"name_","type":"string"},{"name":"symbol_","type":"string"},{"name":"decimals_","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":true,"stateMutability":"payable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":false,"name":"interestAccumulated","type":"uint256"},{"indexed":false,"name":"borrowIndex","type":"uint256"},{"indexed":false,"name":"totalBorrows","type":"uint256"}],"name":"AccrueInterest","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"minter","type":"address"},{"indexed":false,"name":"mintAmount","type":"uint256"},{"indexed":false,"name":"mintTokens","type":"uint256"}],"name":"Mint","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"redeemer","type":"address"},{"indexed":false,"name":"redeemAmount","type":"uint256"},{"indexed":false,"name":"redeemTokens","type":"uint256"}],"name":"Redeem","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"borrower","type":"address"},{"indexed":false,"name":"borrowAmount","type":"uint256"},{"indexed":false,"name":"accountBorrows","type":"uint256"},{"indexed":false,"name":"totalBorrows","type":"uint256"}],"name":"Borrow","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"payer","type":"address"},{"indexed":false,"name":"borrower","type":"address"},{"indexed":false,"name":"repayAmount","type":"uint256"},{"indexed":false,"name":"accountBorrows","type":"uint256"},{"indexed":false,"name":"totalBorrows","type":"uint256"}],"name":"RepayBorrow","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"liquidator","type":"address"},{"indexed":false,"name":"borrower","type":"address"},{"indexed":false,"name":"repayAmount","type":"uint256"},{"indexed":false,"name":"cTokenCollateral","type":"address"},{"indexed":false,"name":"seizeTokens","type":"uint256"}],"name":"LiquidateBorrow","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldPendingAdmin","type":"address"},{"indexed":false,"name":"newPendingAdmin","type":"address"}],"name":"NewPendingAdmin","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldAdmin","type":"address"},{"indexed":false,"name":"newAdmin","type":"address"}],"name":"NewAdmin","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldComptroller","type":"address"},{"indexed":false,"name":"newComptroller","type":"address"}],"name":"NewComptroller","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldInterestRateModel","type":"address"},{"indexed":false,"name":"newInterestRateModel","type":"address"}],"name":"NewMarketInterestRateModel","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"oldReserveFactorMantissa","type":"uint256"},{"indexed":false,"name":"newReserveFactorMantissa","type":"uint256"}],"name":"NewReserveFactor","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"admin","type":"address"},{"indexed":false,"name":"reduceAmount","type":"uint256"},{"indexed":false,"name":"newTotalReserves","type":"uint256"}],"name":"ReservesReduced","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"error","type":"uint256"},{"indexed":false,"name":"info","type":"uint256"},{"indexed":false,"name":"detail","type":"uint256"}],"name":"Failure","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"owner","type":"address"},{"indexed":true,"name":"spender","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Approval","type":"event"}
-    ];
-    const compoundCEthContract = new web3.eth.Contract(abiJson, contractAddress);
+    const compoundCEthContract = new web3.eth.Contract(CEtherABI, contractAddress);
     const supplyRatePerBlockMantissa = await compoundCEthContract.methods.
       supplyRatePerBlock().call()
     const interestPerEthThisBlock = supplyRatePerBlockMantissa / 1e18;
@@ -88,8 +329,8 @@ contract("Compound", accounts => {
     // Mint some cETH by supplying ETH to the Compound Protocol
     await compoundCEthContract.methods.mint().send({
       from: myWalletAddress,
-      gasLimit: web3.utils.toHex(150000),      // posted at compound.finance/developers#gas-costs
-      gasPrice: web3.utils.toHex(20000000000), // use ethgasstation.info (mainnet only)
+      gasLimit: web3.utils.toHex(150000),
+      gasPrice: web3.utils.toHex(20000000000),
       value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
     });
   
@@ -123,3 +364,8 @@ contract("Compound", accounts => {
     console.log("My wallet's cETH Token Balance:", cTokenBalance);
   });
 });
+
+
+function delay(ms: number) {
+    return new Promise( resolve => setTimeout(resolve, ms) );
+}
