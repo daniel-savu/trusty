@@ -92,7 +92,7 @@ contract("trusty_aave", accounts => {
             referralCode, 
             {
                 from: myWalletAddress,
-                gasLimit: web3.utils.toHex(150000),
+                gasLimit: web3.utils.toHex(1500000),
                 gasPrice: web3.utils.toHex(20000000000),
                 value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
             }

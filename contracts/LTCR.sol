@@ -1,10 +1,9 @@
 pragma solidity ^0.5.0;
 
-// import "@openzeppelin/contracts-ethereum-package/contracts/ownership/Ownable.sol";
-import "@nomiclabs/buidler/console.sol";
+import "./InitializableAdminUpgradeabilityProxy.sol";
+// import "@openzeppelin/contracts/ownership/Ownable.sol";
 
-
-contract LTCR {
+contract LTCR is Ownable {
     uint256 _minCollateral; // minimum collateral
     uint256 _decimals; // decimals to calculate collateral factor
 
@@ -32,7 +31,7 @@ contract LTCR {
     constructor() public {
         _decimals = 3; // e.g. a factor of 1500 is equal to 1.5 times the collateral
         _round = 0; // init rounds
-    
+        
         _blockperiod = 1; // wait for 10 blocks to curate
         _start = block.number;
         _end = block.number + _blockperiod;
@@ -56,8 +55,7 @@ contract LTCR {
     // ### Collateral ###
     // ##################
 
-    // function setCollateral(uint256 mincollateral) public onlyOwner returns (bool) {
-    function setCollateral(uint256 mincollateral) public returns (bool) {
+    function setCollateral(uint256 mincollateral) public onlyOwner returns (bool) {
         _minCollateral = mincollateral;
         return true;
     }
@@ -77,8 +75,7 @@ contract LTCR {
         return _factors[layer];
     }
 
-    // function setFactor(uint8 layer, uint256 factor) public onlyOwner returns (bool) {
-    function setFactor(uint8 layer, uint256 factor) public returns (bool) {
+    function setFactor(uint8 layer, uint256 factor) public onlyOwner returns (bool) {
         require(factor >= (10 ** _decimals), "factor needs to be above or equal to 1.0");
         require(layer > 0, "layer 0 is reserved");
         _factors[layer] = factor;
@@ -93,8 +90,7 @@ contract LTCR {
         return _rewards[action];
     }
 
-    // function setReward(uint256 action, uint256 reward) public onlyOwner returns (bool) {
-    function setReward(uint256 action, uint256 reward) public returns (bool) {
+    function setReward(uint256 action, uint256 reward) public onlyOwner returns (bool) {
         _rewards[action] = reward;
         return true;
     }
@@ -107,8 +103,7 @@ contract LTCR {
         return (_lower[layer], _upper[layer]);
     }
 
-    // function setBounds(uint8 layer, uint256 lower, uint256 upper) public onlyOwner returns (bool) {
-    function setBounds(uint8 layer, uint256 lower, uint256 upper) public returns (bool) {
+    function setBounds(uint8 layer, uint256 lower, uint256 upper) public onlyOwner returns (bool) {
         _lower[layer] = lower;
         _upper[layer] = upper;
 
@@ -126,7 +121,7 @@ contract LTCR {
     function getAssignment(address agent) public view returns(uint8 assignment) {
         // check if agent is registered
         if (_agents[agent]) {
-            // check if agent is assigned to a layer in the current round
+            // check if agent is assigned to a layer in the current round        
             if (_assignments[_round][agent] == 0) {
                 // check if the agent was assigned to a layer in previous rounds
                 for (uint8 i = 1; i < _layers.length && i < _round; i++) {
@@ -170,9 +165,9 @@ contract LTCR {
         _deposits[agent] = collateral;
         // update the score of the agent
         _scores[_round][agent] += _rewards[0];
-    
+        
         emit RegisterAgent(agent, collateral);
-    
+        
         return true;
     }
 
@@ -202,8 +197,7 @@ contract LTCR {
         } else {
             _assignments[_round + 1][agent] = assignment;
         }
-        console.log("rwds");
-        console.log(_rewards[action]);
+        
         emit Update(agent, _rewards[action], _scores[_round][agent]);
 
         return true;
@@ -211,8 +205,7 @@ contract LTCR {
 
     event Update(address agent, uint256 reward, uint256 score);
 
-    // function curate() public onlyOwner returns (bool) {
-    function curate() public returns (bool) {
+    function curate() public onlyOwner returns (bool) {
         require(_start != 0, "period not started");
         require(block.number >= _end, "period not ended");
 
