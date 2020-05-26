@@ -32,7 +32,7 @@ contract LTCR is Ownable {
         _decimals = 3; // e.g. a factor of 1500 is equal to 1.5 times the collateral
         _round = 0; // init rounds
         
-        _blockperiod = 1; // wait for 10 blocks to curate
+        _blockperiod = 1; // wait for 1 block to curate
         _start = block.number;
         _end = block.number + _blockperiod;
     }
@@ -76,8 +76,8 @@ contract LTCR is Ownable {
     }
 
     function setFactor(uint8 layer, uint256 factor) public onlyOwner returns (bool) {
-        require(factor >= (10 ** _decimals), "factor needs to be above or equal to 1.0");
-        require(layer > 0, "layer 0 is reserved");
+        // require(factor >= (10 ** _decimals), "factor needs to be above or equal to 1.0");
+        // require(layer > 0, "layer 0 is reserved");
         _factors[layer] = factor;
         return true;
     }

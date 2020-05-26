@@ -30,8 +30,80 @@ contract trustyAaveProxy is Ownable {
         0x0D8775F648430679A709E98d2b0Cb6250d2887EF,
         0xdd974D5C2e2928deA5F71b9825b8b646686BD200
     ];
+    uint depositAction;
+    uint borrowAction;
+    uint repayAction;
+    uint liquidationCallAction;
+    uint flashLoanAction;
+    uint redeemAction;
+
+    uint8[] layers;
+    uint256[] layerFactors;
+    uint256[] layerLowerBounds;
+    uint256[] layerUpperBound;
 
     constructor(address agent) public {
+        ltcr = new LTCR();
+        ltcr.setCollateral(1);
+        // Below are some mock layer factors for demonstration purposes.
+        // Proper factors need to be chosen following a game theoretical analysis,
+        // like in the section 7 of the Balance paper: https://dl.acm.org/doi/pdf/10.1145/3319535.3354221
+
+        layers.push(1);
+        layers.push(2);
+        layers.push(3);
+        layers.push(4);
+        layers.push(5);
+
+        // the Layer Token Curated Registry contract (LTCR) uses 3 decimals
+        // the LTCR is based on Balance: https://github.com/nud3l/balance
+        layerFactors.push(2000);
+        layerFactors.push(1800);
+        layerFactors.push(1500); // 153% is the highest collateral ratio in Aave
+        layerFactors.push(1250);
+        layerFactors.push(1100);
+
+        layerLowerBounds.push(0);
+        layerLowerBounds.push(20);
+        layerLowerBounds.push(40);
+        layerLowerBounds.push(60);
+        layerLowerBounds.push(80);
+
+        layerUpperBound.push(25);
+        layerUpperBound.push(45);
+        layerUpperBound.push(65);
+        layerUpperBound.push(85);
+        layerUpperBound.push(10000);
+
+
+        setParameters(
+            layers,
+            layerFactors,
+            layerLowerBounds,
+            layerUpperBound
+        );
+
+        // setting the reward for each action
+        // ideally, the reward depends on the parameters of the call to Aave
+        // but for now, a certain action will carry a certain score.
+        // The rewards could potentially be decided by the Aave Protocol Governance
+        // Mapping of actions to their id:
+        depositAction = 1;
+        borrowAction = 2;
+        repayAction = 3;
+        liquidationCallAction = 4;
+        flashLoanAction = 5;
+        redeemAction = 6;
+        
+        ltcr.setReward(depositAction, 15);
+        ltcr.setReward(borrowAction, 0);
+        ltcr.setReward(repayAction, 5);
+        ltcr.setReward(liquidationCallAction, 10);
+        ltcr.setReward(flashLoanAction, 10);
+        ltcr.setReward(redeemAction, 0);
+
+        ltcr.registerAgent(agent, 100);
+
         agentOwner = agent;
         aTokenUnwrapper[aETHContractAddress] = aETHAddress;
         aTokenWrapper[aETHAddress] = aETHContractAddress;
@@ -53,7 +125,6 @@ contract trustyAaveProxy is Ownable {
         uint256[] memory layerLowerBounds,
         uint256[] memory layerUpperBounds
     ) public onlyOwner { //should be onlyOwner in the future
-        ltcr = new LTCR();
         ltcr.setLayers(layers);
         setFactors(layers, layerFactors);
         setBounds(layers, layerLowerBounds, layerUpperBounds);
@@ -78,6 +149,14 @@ contract trustyAaveProxy is Ownable {
         for (uint8 i = 0; i < layers.length; i++) {
             ltcr.setBounds(layers[i], layerLowerBounds[i], layerUpperBounds[i]);
         }
+    }
+
+    function curate() public {
+        ltcr.curate();
+    }
+
+    function getAgentFactor() public view returns (uint256) {
+        return ltcr.getAgentFactor(agentOwner);
     }
 
     function withdrawFunds(address _reserve) public onlyAgentOwner {
@@ -108,10 +187,6 @@ contract trustyAaveProxy is Ownable {
         return false;
     }
 
-    // function getCurrentATokenBalance(address _reserve) public view returns(uint256) {
-    //     return aTokens[_reserve];
-    // }
-
     function getCurrentFundsBalance(address _reserve) public view returns(uint256) {
         return fundsInTrustyAave[_reserve];
     }
@@ -122,15 +197,14 @@ contract trustyAaveProxy is Ownable {
     function updateAgentReserveData(address _reserve) public {
         if(isERC20Token(_reserve)) {
             updateAgentERC20(_reserve);
-        } 
-        else {
-            updateAgentAToken(_reserve);
+        } else {
+            // commenting out this function for now, as it reverts the tx
+            // updateAgentAToken(_reserve);
         }
     }
 
     function updateAgentAToken(address _reserve) public {
         address LendingPoolAddress = getLendingPoolAddress();
-        // (uint256 currentATokenBalance, , , , , , , , , ,) = ILendingPool(LendingPoolAddress).getUserReserveData(_reserve, address(this));
         bytes memory abiEncoding = abi.encodeWithSignature("getUserReserveData(address,address)", _reserve, this);
         (bool success, bytes memory result) = LendingPoolAddress.call(abiEncoding);
         (uint256 currentATokenBalance, , , , , , , , ,) = abi.decode(
@@ -162,6 +236,7 @@ contract trustyAaveProxy is Ownable {
         (bool success, ) = _reserve.call(redeemAbiEncoding);
         // require(success);
         updateAgentReserveData(_reserve);
+        ltcr.update(agentOwner, redeemAction);
     }
 
     // LendingPool contract
@@ -191,6 +266,7 @@ contract trustyAaveProxy is Ownable {
         // require(success);
         updateAgentReserveData(_reserve);
         updateAgentReserveData(aTokenWrapper[_reserve]);
+        // ltcr.update(agentOwner, depositAction);
     }
 
     function borrow(address _reserve, uint256 _amount, uint256 _interestRateMode, uint16 _referralCode) public {
@@ -205,6 +281,7 @@ contract trustyAaveProxy is Ownable {
         (bool success, ) = LendingPoolAddress.call(abiEncoding);
         // require(success);
         updateAgentReserveData(_reserve);
+        ltcr.update(agentOwner, borrowAction);
     }
 
     function repay(address _reserve, uint256 _amount, address _onBehalfOf) public {
@@ -229,6 +306,7 @@ contract trustyAaveProxy is Ownable {
         // we're paying back the loan using fundsInTrustyAave, so both
         // the aToken amount and the fundsInTrustyAave[_reserve] will shrink
         updateAgentReserveData(_reserve);
+        ltcr.update(agentOwner, repayAction);
     }
 
     function flashLoan(address _receiver, address _reserve, uint256 _amount, bytes calldata _params) external {
@@ -243,6 +321,7 @@ contract trustyAaveProxy is Ownable {
         (bool success, ) = LendingPoolAddress.call(flashLoanAbiEncoding);
         // require(success);
         updateAgentReserveData(_reserve);
+        ltcr.update(agentOwner, flashLoanAction);
     }
 
     function liquidationCall(
@@ -275,6 +354,7 @@ contract trustyAaveProxy is Ownable {
         // require(success);
         updateAgentReserveData(_collateral);
         updateAgentReserveData(_reserve);
+        ltcr.update(agentOwner, liquidationCallAction);
     }
 
 }
