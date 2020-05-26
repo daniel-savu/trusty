@@ -1,6 +1,6 @@
 var LTCR = artifacts.require("./LTCR.sol");
 var trusty_compound = artifacts.require("./trusty_compound.sol");
-var trusty_aave = artifacts.require("./trusty_aave.sol");
+var trustyAaveProxy = artifacts.require("./trustyAaveProxy.sol");
 var trusty = artifacts.require("./trusty.sol");
 var FlashLoanExecutor = artifacts.require("./FlashLoanExecutor.sol");
 var InitializableAdminUpgradeabilityProxy = artifacts.require("./InitializableAdminUpgradeabilityProxy.sol");
@@ -12,7 +12,7 @@ var LendingPoolAddressesProviderABI = require("../test/ABIs/LendingPoolAddresses
 module.exports = function (deployer) {
     deployer.deploy(LTCR);
     deployer.deploy(trusty_compound);
-    deployer.deploy(trusty_aave);
+    // deployer.deploy(trustyAaveProxy);
     deployer.deploy(trusty);
     const lpAddressProviderContract = new web3.eth.Contract(LendingPoolAddressesProviderABI, lpAddressProviderAddress)
     deployer.deploy(FlashLoanExecutor, lpAddressProviderContract.options.address);
