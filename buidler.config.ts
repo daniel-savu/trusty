@@ -32,7 +32,8 @@ const config: BuidlerConfig = {
     playground: {
       url: `http://127.0.0.1:2000`,
       accounts: [`0x01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548`],
-      blockGasLimit: 16000000000
+      blockGasLimit: 16000000000,
+      timeout: 200000
     },
   }
 };

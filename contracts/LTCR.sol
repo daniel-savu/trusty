@@ -1,9 +1,11 @@
 pragma solidity ^0.5.0;
 
-import "./InitializableAdminUpgradeabilityProxy.sol";
-// import "@openzeppelin/contracts/ownership/Ownable.sol";
+// import "./InitializableAdminUpgradeabilityProxy.sol";
+import "@openzeppelin/contracts/ownership/Ownable.sol";
 
 contract LTCR is Ownable {
+    address[] authorisedContracts;
+
     uint256 _minCollateral; // minimum collateral
     uint256 _decimals; // decimals to calculate collateral factor
 
@@ -29,12 +31,29 @@ contract LTCR is Ownable {
     uint256 _end; // end of period
 
     constructor() public {
+        addAuthorisedContract(msg.sender);
         _decimals = 3; // e.g. a factor of 1500 is equal to 1.5 times the collateral
         _round = 0; // init rounds
         
         _blockperiod = 1; // wait for 1 block to curate
         _start = block.number;
         _end = block.number + _blockperiod;
+    }
+
+    function addAuthorisedContract(address authorisedContract) public onlyOwner {
+        authorisedContracts.push(authorisedContract);
+    }
+
+    modifier onlyAuthorised() {
+        bool isAuthorised = false;
+        for (uint i = 0; i < authorisedContracts.length; i++) {
+            if(authorisedContracts[i] == msg.sender) {
+                isAuthorised = true;
+                break;
+            }
+        }
+        require(isAuthorised == true, "Caller is not authorised to perform this action");
+        _;
     }
     
     // ##############
@@ -55,7 +74,7 @@ contract LTCR is Ownable {
     // ### Collateral ###
     // ##################
 
-    function setCollateral(uint256 mincollateral) public onlyOwner returns (bool) {
+    function setCollateral(uint256 mincollateral) public onlyAuthorised returns (bool) {
         _minCollateral = mincollateral;
         return true;
     }
@@ -75,7 +94,7 @@ contract LTCR is Ownable {
         return _factors[layer];
     }
 
-    function setFactor(uint8 layer, uint256 factor) public onlyOwner returns (bool) {
+    function setFactor(uint8 layer, uint256 factor) public onlyAuthorised returns (bool) {
         // require(factor >= (10 ** _decimals), "factor needs to be above or equal to 1.0");
         // require(layer > 0, "layer 0 is reserved");
         _factors[layer] = factor;
@@ -90,7 +109,7 @@ contract LTCR is Ownable {
         return _rewards[action];
     }
 
-    function setReward(uint256 action, uint256 reward) public onlyOwner returns (bool) {
+    function setReward(uint256 action, uint256 reward) public onlyAuthorised returns (bool) {
         _rewards[action] = reward;
         return true;
     }
@@ -103,7 +122,7 @@ contract LTCR is Ownable {
         return (_lower[layer], _upper[layer]);
     }
 
-    function setBounds(uint8 layer, uint256 lower, uint256 upper) public onlyOwner returns (bool) {
+    function setBounds(uint8 layer, uint256 lower, uint256 upper) public onlyAuthorised returns (bool) {
         _lower[layer] = lower;
         _upper[layer] = upper;
 
@@ -205,7 +224,7 @@ contract LTCR is Ownable {
 
     event Update(address agent, uint256 reward, uint256 score);
 
-    function curate() public onlyOwner returns (bool) {
+    function curate() public onlyAuthorised returns (bool) {
         require(_start != 0, "period not started");
         require(block.number >= _end, "period not ended");
 
