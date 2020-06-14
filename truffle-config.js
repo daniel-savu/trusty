@@ -47,6 +47,15 @@ module.exports = {
     //  port: 8545,            // Standard Ethereum port (default: none)
      port: 2000,            // Standard Ethereum port (default: none)
      network_id: "*",       // Any network (default: none)
+     timeout: 200000
+    },
+    playground: {
+      host: `http://127.0.0.1:2000`,
+      port: 2000,
+      network_id: 5
+      // accounts: [`0x01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548`],
+      // blockGasLimit: 16000000000,
+      // timeout: 200000
     },
 
     // Another network with more advanced options...

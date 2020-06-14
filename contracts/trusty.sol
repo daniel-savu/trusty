@@ -4,6 +4,7 @@ pragma solidity ^0.5.0;
 import "@nomiclabs/buidler/console.sol";
 import "./trustyAaveProxy.sol";
 import "./LTCR.sol";
+import "./UserProxy.sol";
 // import "node_modules/@studydefi/money-legos/compound/contracts/ICEther.sol";
 
 
@@ -11,6 +12,8 @@ contract trusty {
     string[] _protocols;
     address constant CEtherAddress = 0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5;
     address constant aETHAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    mapping (address => UserProxy) userAddressToUserProxy;
+    mapping (address => address) userProxyToUserAddress;
     mapping (address => trustyAaveProxy) agentAaveContracts;
     LTCR aaveLTCR;
     mapping (address => bool) isAgentInitialized;
@@ -20,22 +23,9 @@ contract trusty {
     uint256[] aaveLayerLowerBounds;
     uint256[] aaveLayerUpperBounds;
 
-
     constructor() public {
         aaveLTCR = new LTCR();
-    }
-
-    // should be renamed getProxy and return protocol contract dynamically
-    function initializeAaveProxy() public {
-        if (!isAgentInitialized[msg.sender]) {
-            initializeAaveLTCR();
-            trustyAaveProxy proxy = new trustyAaveProxy(msg.sender, address(aaveLTCR), this);
-            agentAaveContracts[msg.sender] = proxy;
-            aaveLTCR.addAuthorisedContract(address(proxy));
-
-            proxy.registerAgentToLTCR();
-            isAgentInitialized[msg.sender] = true;
-        }
+        initializeAaveLTCR();
     }
 
     function initializeAaveLTCR() private {
@@ -113,25 +103,58 @@ contract trusty {
         aaveLTCR.setReward(redeemAction, 0);
     }
 
+    function addAgent() public {
+        if (!isAgentInitialized[msg.sender]) {
+            UserProxy userProxy = new UserProxy(msg.sender, address(this));
+            userAddressToUserProxy[msg.sender] = userProxy;
+            userProxyToUserAddress[address(userProxy)] = msg.sender;
+            initializeAaveProxy();
+            // add other protocol initializations here
+            // such as initializeCompoundProxy when done
+            isAgentInitialized[msg.sender] = true;
+        }
+    }
+
+    function isAddressATrustyProxy(address userProxyAddress) public view returns (bool) {
+        return userProxyToUserAddress[userProxyAddress] != address(0);
+    }
+
+    function addLTCRsToUserProxy() private {
+        userAddressToUserProxy[msg.sender].addLTCR(address(aaveLTCR));
+    }
+
+    function initializeAaveProxy() private {
+        UserProxy userProxy = userAddressToUserProxy[msg.sender];
+        trustyAaveProxy aaveProxy = new trustyAaveProxy(msg.sender, address(aaveLTCR), address(this), address(userProxy));
+        agentAaveContracts[msg.sender] = aaveProxy;
+        aaveLTCR.addAuthorisedContract(address(aaveProxy));
+        aaveProxy.registerAgentToLTCR();
+        userProxy.addAuthorisedContract(address(agentAaveContracts[msg.sender]));
+    }
+
     function getAaveProxy()  public view returns (trustyAaveProxy) {
-        require(isAgentInitialized[msg.sender], "No proxy contract exists for caller. You need to initialize one first.");
+        require(isAgentInitialized[msg.sender], "No proxy contract exists for caller. You need to call addAgent first.");
         return agentAaveContracts[msg.sender];
     }
 
-    function protocolAlreadyAdded(string memory protocol) private view returns(bool) {
-        for (uint8 i = 0; i < _protocols.length; i++) {
-            if(identicalStrings(_protocols[i], protocol)) {
-                return true;
-            }
+    function getUserProxy(address userAddress) public view returns (address) {
+        return address(userAddressToUserProxy[userAddress]);
+    }
+
+    function findUserProxy(address userAddress) public returns (address) {
+        address userProxy = getUserProxy(userAddress);
+        if(userProxy == address(0)) {
+            return userAddress;
         }
-        return false;
+        return userProxy;
     }
 
-    function identicalStrings(string memory a, string memory b) public pure returns(bool) {
-        return keccak256(bytes(a)) == keccak256(bytes(b));
+    function getAgentCollateral(address agent) public pure returns (uint256) {
+        // a factor of 1500 is equal to 1.5 times the collateral
+        return 1000;
     }
 
-    function moveFundsToAaveProxy(address agentOwner, address _reserve, uint _amount) public {
+    function moveFundsToUserProxy(address agentOwner, address _reserve, uint _amount) public {
         // this method assumes proxies will never ask for more funds than they have
         require(address(agentAaveContracts[agentOwner]) == msg.sender, "Proxy/User mismatch");
         if(_reserve != aETHAddress) {
