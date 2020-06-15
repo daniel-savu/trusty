@@ -25,7 +25,7 @@ contract AaveCollateralManager {
     function makeCall(
         address target,
         bytes memory abiEncoding
-    ) public payable {
+    ) public payable returns (bool) {
         if(callNeedsCollateral(target, abiEncoding)) {
             (address reserve, uint256 amount) = getReserveAndAmount(abiEncoding);
             require(checkReserveAmount(reserve, amount), "Funds received are not enough");
@@ -41,7 +41,8 @@ contract AaveCollateralManager {
                 require(totalCollateral >= loanWorth * (defaultCollateralisation / (10 ** _decimals)), "too little collateral");
             }
         }
-        target.call(abiEncoding);
+        (bool success, ) = target.delegatecall(abiEncoding);
+        return success;
     }
 
     function checkReserveAmount(address reserve, uint256 amount) private returns (bool) {
