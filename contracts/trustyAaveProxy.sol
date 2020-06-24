@@ -27,7 +27,7 @@ contract trustyAaveProxy is Ownable {
     trusty trustyContract;
     UserProxy userProxy;
 
-    constructor(address agent, address ltcrAddress, address payable trustyAddress, address userProxyAddress) public {
+    constructor(address agent, address ltcrAddress, address payable trustyAddress, address payable userProxyAddress) public {
         agentOwner = agent;
         trustyContract = trusty(trustyAddress);
         userProxy = UserProxy(userProxyAddress);
@@ -111,7 +111,6 @@ contract trustyAaveProxy is Ownable {
             "repay(address,uint256,address)",
             reserve,
             amount,
-            address(this),
             agentRecipient
         );
         address LendingPoolAddress = getLendingPoolAddress();

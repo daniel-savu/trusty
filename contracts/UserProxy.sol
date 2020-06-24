@@ -20,12 +20,13 @@ contract UserProxy is Ownable {
     trusty trustyContract;
 
 
-
     constructor(address agent, address payable trustyAddress) public {
         trustyContract = trusty(trustyAddress);
         addAuthorisedContract(msg.sender);
         agentOwner = agent;
     }
+
+    function() external payable {}
 
     function addAuthorisedContract(address authorisedContract) public onlyOwner {
         authorisedContracts.push(authorisedContract);
@@ -64,7 +65,7 @@ contract UserProxy is Ownable {
         _;
     }
 
-    modifier hasEnoughFunds(address _reserve, uint256 _amount) {
+    function subtractFunds(address _reserve, uint256 _amount) private {
         int256 amount = uintToInt(_amount);
         // agentFundsInPool[_reserve] can be negative but this is accounted for
         if(_reserve != aETHAddress) {
@@ -75,7 +76,6 @@ contract UserProxy is Ownable {
                 uint256 difference = intToUint(amount - ERCTokenBalance);
                 trustyContract.moveFundsToUserProxy(agentOwner, _reserve, difference);
                 agentFundsInPool[_reserve] -= amount;
-
             }
         } else {
             int256 ethBalance = uintToInt(address(this).balance);
@@ -87,7 +87,6 @@ contract UserProxy is Ownable {
                 agentFundsInPool[_reserve] -= amount;
             }
         }
-        _;
     }
 
     function uintToInt(uint256 a) private pure returns (int256) {
@@ -100,12 +99,14 @@ contract UserProxy is Ownable {
         return uint256(a);
     }
 
-    function moveFundsToPool(address _reserve, uint256 _amount) public onlyOwner hasEnoughFunds(_reserve, _amount) {
+    function moveFundsToPool(address _reserve, uint256 _amount) public onlyOwner {
+        subtractFunds(_reserve, _amount);
         agentFundsInPool[_reserve] += uintToInt(_amount);
         withdrawFunds(_reserve, _amount);
     }
 
-    function withdrawFunds(address _reserve, uint256 _amount) public onlyAgentOwner hasEnoughFunds(_reserve, _amount) {
+    function withdrawFunds(address _reserve, uint256 _amount) public onlyAgentOwner {
+        subtractFunds(_reserve, _amount);
         if(_reserve != aETHAddress) {
             IERC20(_reserve).transfer(msg.sender, _amount);
         } else {
@@ -115,7 +116,7 @@ contract UserProxy is Ownable {
 
     function depositFunds(address _reserve, uint256 _amount) public payable onlyAgentOwner {
         if(_reserve == aETHAddress) {
-            require(msg.value == _amount, "_amount does not match the send ETH");
+            require(msg.value == _amount, "_amount does not match the sent ETH");
         } else {
             IERC20(_reserve).transferFrom(msg.sender, address(this), _amount);
         }
@@ -137,11 +138,12 @@ contract UserProxy is Ownable {
         }
     }
 
-    function proxyCall(address target, bytes memory abiEncoding) public onlyAuthorised payable returns (bool) {
+    function proxyCall(address target, bytes memory abiEncoding) public payable returns (bool) {
         // the following variables are set to 0 because they are not applicable to this call
         address currencyReserve = address(0);
         uint256 currencyAmount = 0;
-        return proxyCall(target, abiEncoding, currencyReserve, currencyAmount);
+        bool proxyCallResult = proxyCall(target, abiEncoding, currencyReserve, currencyAmount);
+        return proxyCallResult;
     }
 
 // when calling the CM, pass target as a parameter; also pass abiEncoding as a parameter
@@ -151,18 +153,20 @@ contract UserProxy is Ownable {
         bytes memory abiEncoding,
         address reserve,
         uint256 amount
-    ) public onlyAuthorised hasEnoughFunds(reserve, amount) payable returns (bool) {
+    ) public onlyAuthorised payable returns (bool) {
         require(target != address(0), "Target address cannot be 0");
+        if(reserve != address(0)) {
+            subtractFunds(reserve, amount);
+        }
         bool success;
-        if(msg.value > 0) {
+        if(amount > 0) {
             require(reserve != address(0), "Reserve address cannot be 0");
             if(reserve != aETHAddress) {
                 address LendingPoolCoreAddress = ILendingPoolAddressesProvider(LendingPoolAddressesProviderAddress).getLendingPoolCore();
                 IERC20(reserve).approve(LendingPoolCoreAddress, amount);
                 (success, ) = target.call(abiEncoding);
             } else {
-                require(amount == msg.value, "Amount submitted by proxy differs from the amount parameter value");
-                (success, ) = target.call.value(msg.value)(abiEncoding);
+                (success, ) = target.call.value(amount)(abiEncoding);
             }
         } else {
             (success, ) = target.call(abiEncoding);
