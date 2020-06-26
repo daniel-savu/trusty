@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract AaveCollateralManager {
 // can be called by any address
 // however, trusty addresses may receive a collateral discount
-
+    address targetAddress;
     trusty trustyContract;
     address constant aETHAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant LendingPoolAddressesProviderAddress = 0x24a42fD28C976A61Df5D00D0599C34c4f90748c8;
@@ -22,26 +22,68 @@ contract AaveCollateralManager {
         trustyContract = trusty(trustyAddress);
     }
 
+    function() external payable {
+        assembly {
+            let _target := sload(0)
+            //0x40 is the address where the next free memory slot is stored in Solidity
+            let _calldataMemoryOffset := mload(0x40)
+            // new "memory end" including padding. The bitwise operations here ensure we get rounded up to the nearest 32 byte boundary
+            let _size := and(add(calldatasize, 0x1f), not(0x1f))
+            // Update the pointer at 0x40 to point at new free memory location so any theoretical allocation doesn't stomp our memory in this call
+            mstore(0x40, add(_calldataMemoryOffset, _size))
+            // Copy method signature and parameters of this call into memory
+            calldatacopy(_calldataMemoryOffset, 0x0, calldatasize)
+            // Call the actual method via delegation
+            let _retval := call(gas, _target, callvalue, _calldataMemoryOffset, calldatasize, 0, 0)
+            switch _retval
+            case 0 {
+                // 0 == it threw, so we revert
+                revert(0,0)
+            } default {
+                // If the call succeeded return the return data from the delegate call
+                let _returndataMemoryOffset := mload(0x40)
+                // Update the pointer at 0x40 again to point at new free memory location so any theoretical allocation doesn't stomp our memory in this call
+                mstore(0x40, add(_returndataMemoryOffset, returndatasize))
+                returndatacopy(_returndataMemoryOffset, 0x0, returndatasize)
+                return(_returndataMemoryOffset, returndatasize)
+            }
+        }
+    }
+
+    function setTarget(address target) public {
+        targetAddress = target;
+    }
+
+// we need to pass the target because there are several Aave contracts deployed
     function makeCall(
         address target,
         bytes memory abiEncoding
     ) public payable returns (bool) {
-        if(callNeedsCollateral(target, abiEncoding)) {
-            (address reserve, uint256 amount) = getReserveAndAmount(abiEncoding);
-            require(checkReserveAmount(reserve, amount), "Funds received are not enough");
-            uint256 totalCollateral = getTotalCollateral();
-            uint256 loanWorth = getWorthOfLoan(reserve, amount);
+        // (address reserve, uint256 amount) = getReserveAndAmount(abiEncoding);
+        // if(callNeedsCollateral(target, abiEncoding)) {
+        //     require(checkReserveAmount(reserve, amount), "Funds received are not enough");
+        //     uint256 totalCollateral = getTotalCollateral();
+        //     uint256 loanWorth = getWorthOfLoan(reserve, amount);
 
-            if(trustyContract.isAddressATrustyProxy(msg.sender)) {
-                // we can apply collateral reduction
-                uint256 collateralisation = trustyContract.getAgentCollateral(msg.sender);
-                require(totalCollateral >= loanWorth * ((defaultCollateralisation * collateralisation) / (10 ** _decimals)), "too little collateral");
-            } else {
-                // otherwise, just use the defaultCollateralisation
-                require(totalCollateral >= loanWorth * (defaultCollateralisation / (10 ** _decimals)), "too little collateral");
-            }
-        }
-        (bool success, ) = target.delegatecall(abiEncoding);
+        //     if(trustyContract.isAddressATrustyProxy(msg.sender)) {
+        //         // we can apply collateral reduction
+        //         uint256 collateralisation = trustyContract.getAgentCollateral(msg.sender);
+        //         require(totalCollateral >= loanWorth * ((defaultCollateralisation * collateralisation) / (10 ** _decimals)), "too little collateral");
+        //     } else {
+        //         // otherwise, just use the defaultCollateralisation
+        //         require(totalCollateral >= loanWorth * (defaultCollateralisation / (10 ** _decimals)), "too little collateral");
+        //     }
+        // }
+        bool success;
+        // if(amount > 0) {
+        //     require(reserve != address(0), "Reserve address cannot be 0");
+        //     if(reserve != aETHAddress) {
+        //         IERC20(reserve).transferFrom(msg.sender, address(this), amount);
+        //         IERC20(reserve).approve(target, amount);
+        //     }
+        // }
+        (success, ) = target.delegatecall(abiEncoding);
+
         return success;
     }
 
@@ -114,10 +156,6 @@ contract AaveCollateralManager {
         (address reserve, uint256 amount, uint256 interestRateMode, uint16 referralCode) = abi.decode(abiEncoding, (address, uint256, uint256, uint16));
         return (reserve, amount);
 
-    }
-
-    function() external payable {
-        console.log("reached the fallback");
     }
 
 }

@@ -147,7 +147,6 @@ contract UserProxy is Ownable {
     }
 
 // when calling the CM, pass target as a parameter; also pass abiEncoding as a parameter
-// 
     function proxyCall(
         address target,
         bytes memory abiEncoding,
@@ -162,8 +161,7 @@ contract UserProxy is Ownable {
         if(amount > 0) {
             require(reserve != address(0), "Reserve address cannot be 0");
             if(reserve != aETHAddress) {
-                address LendingPoolCoreAddress = ILendingPoolAddressesProvider(LendingPoolAddressesProviderAddress).getLendingPoolCore();
-                IERC20(reserve).approve(LendingPoolCoreAddress, amount);
+                IERC20(reserve).approve(target, amount);
                 (success, ) = target.call(abiEncoding);
             } else {
                 (success, ) = target.call.value(amount)(abiEncoding);

@@ -8,6 +8,7 @@ import "@studydefi/money-legos/aave/contracts/ILendingPoolAddressesProvider.sol"
 import "@nomiclabs/buidler/console.sol";
 import "./trusty.sol";
 import "./UserProxy.sol";
+import "./AaveCollateralManager.sol";
 // import "./InitializableAdminUpgradeabilityProxy.sol";
 
 contract trustyAaveProxy is Ownable {
@@ -17,6 +18,7 @@ contract trustyAaveProxy is Ownable {
     address constant aETHContractAddress = 0x3a3A65aAb0dd2A17E3F1947bA16138cd37d08c04;
     address constant daiAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     LTCR ltcr;
+    AaveCollateralManager aaveCollateralManager;
 
     uint256 depositAction;
     uint256 borrowAction;
@@ -27,12 +29,18 @@ contract trustyAaveProxy is Ownable {
     trusty trustyContract;
     UserProxy userProxy;
 
-    constructor(address agent, address ltcrAddress, address payable trustyAddress, address payable userProxyAddress) public {
+    constructor(
+        address agent,
+        address ltcrAddress,
+        address payable trustyAddress,
+        address payable userProxyAddress,
+        address payable aaveCollateralManagerAddress
+    ) public {
         agentOwner = agent;
         trustyContract = trusty(trustyAddress);
         userProxy = UserProxy(userProxyAddress);
         ltcr = LTCR(ltcrAddress);
-
+        aaveCollateralManager = AaveCollateralManager(aaveCollateralManagerAddress);
         depositAction = 1;
         borrowAction = 2;
         repayAction = 3;
@@ -65,7 +73,12 @@ contract trustyAaveProxy is Ownable {
 
     function redeem(address reserveContract, uint256 amount) public {
         bytes memory abiEncoding = abi.encodeWithSignature("redeem(uint256)", amount);
-        bool success = userProxy.proxyCall(reserveContract, abiEncoding);
+        bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
+            "makeCall(address,bytes)",
+            reserveContract,
+            abiEncoding
+        );
+        bool success = userProxy.proxyCall(address(aaveCollateralManager), collateralManagerAbiEncoding);
         require(success, "redeem failed");
         ltcr.update(agentOwner, redeemAction);
     }
@@ -85,7 +98,12 @@ contract trustyAaveProxy is Ownable {
             amount,
             referralCode
         );
-        bool success = userProxy.proxyCall(LendingPoolAddress, abiEncoding, reserve, amount);
+        bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
+            "makeCall(address,bytes)",
+            LendingPoolAddress,
+            abiEncoding
+        );
+        bool success = userProxy.proxyCall(address(aaveCollateralManager), collateralManagerAbiEncoding, reserve, amount);
         require(success, "deposit failed");
         ltcr.update(agentOwner, depositAction);
     }
@@ -99,7 +117,12 @@ contract trustyAaveProxy is Ownable {
             interestRateMode,
             referralCode
         );
-        bool success = userProxy.proxyCall(LendingPoolAddress, abiEncoding);
+        bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
+            "makeCall(address,bytes)",
+            LendingPoolAddress,
+            abiEncoding
+        );
+        bool success = userProxy.proxyCall(address(aaveCollateralManager), collateralManagerAbiEncoding);
         require(success, "borrow failed");
         ltcr.update(agentOwner, borrowAction);
     }
@@ -107,14 +130,19 @@ contract trustyAaveProxy is Ownable {
     function repay(address reserve, uint256 amount, address onBehalfOf) public {
         // repay loan using funds deposited in userProxy
         address agentRecipient = trustyContract.findUserProxy(onBehalfOf);
+        address LendingPoolAddress = getLendingPoolAddress();
         bytes memory abiEncoding = abi.encodeWithSignature(
             "repay(address,uint256,address)",
             reserve,
             amount,
             agentRecipient
         );
-        address LendingPoolAddress = getLendingPoolAddress();
-        bool success = userProxy.proxyCall(LendingPoolAddress, abiEncoding, reserve, amount);
+        bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
+            "makeCall(address,bytes)",
+            LendingPoolAddress,
+            abiEncoding
+        );
+        bool success = userProxy.proxyCall(address(aaveCollateralManager), collateralManagerAbiEncoding, reserve, amount);
         require(success, "repay failed");
         ltcr.update(agentOwner, repayAction);
     }
@@ -128,7 +156,13 @@ contract trustyAaveProxy is Ownable {
             amount,
             params
         );
-        bool success = userProxy.proxyCall(LendingPoolAddress, abiEncoding);
+        // bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
+        //     "makeCall(address,bytes)",
+        //     LendingPoolAddress,
+        //     abiEncoding
+        // );
+        aaveCollateralManager.setTarget(LendingPoolAddress);
+        bool success = userProxy.proxyCall(address(aaveCollateralManager), abiEncoding);
         require(success, "flashLoan failed");
         ltcr.update(agentOwner, flashLoanAction);
     }
@@ -151,7 +185,12 @@ contract trustyAaveProxy is Ownable {
             purchaseAmount,
             receiveAToken
         );
-        bool success = userProxy.proxyCall(LendingPoolAddress, abiEncoding);
+        bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
+            "makeCall(address,bytes)",
+            LendingPoolAddress,
+            abiEncoding
+        );
+        bool success = userProxy.proxyCall(address(aaveCollateralManager), collateralManagerAbiEncoding);
         require(success, "liquidation failed");
         ltcr.update(agentOwner, liquidationCallAction);
     }

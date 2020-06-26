@@ -16,6 +16,7 @@ const trusty_compound = artifacts.require("trusty_compound");
 const trustyAaveProxy = artifacts.require("trustyAaveProxy");
 const userProxy = artifacts.require("UserProxy");
 const FlashLoanExecutor = artifacts.require("FlashLoanExecutor");
+const AaveCollateralManager = artifacts.require("AaveCollateralManager");
 
 const privateKey = "01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548";
 web3.eth.accounts.wallet.add('0x' + privateKey);
@@ -33,7 +34,7 @@ contract("trustyAaveProxy", accounts => {
     const lpAddressProviderAddress = '0x24a42fD28C976A61Df5D00D0599C34c4f90748c8'
     const lpAddressProviderContract = new web3.eth.Contract(LendingPoolAddressesProviderABI, lpAddressProviderAddress)
 
-    xit("Should take an Aave flashloan using trusty", async function() {
+    it("Should take an Aave flashloan using trusty", async function() {
         this.timeout(1000000);
         const t = await trusty.new();
         await t.addAgent();
@@ -43,6 +44,7 @@ contract("trustyAaveProxy", accounts => {
                 gasPrice: web3.utils.toHex(20000000000),
             });
         const ta = await trustyAaveProxy.at(taAddress)
+
         const flr = await FlashLoanExecutor.new(lpAddressProviderContract.options.address);
         let amount = web3.utils.toWei("100", "ether");
         let params = "0x0";
@@ -58,7 +60,7 @@ contract("trustyAaveProxy", accounts => {
             value: web3.utils.toHex(fee),
             gasLimit: web3.utils.toHex(150000),
             gasPrice: web3.utils.toHex(20000000000),
-         });
+        });
 
         var balance = await web3.eth.getBalance(flr.address); 
         console.log(`Balance before the flashloan (0.09%): ${balance}`);
@@ -75,10 +77,11 @@ contract("trustyAaveProxy", accounts => {
         );
         balance = await web3.eth.getBalance(flr.address); 
         console.log(`Balance after the flashloan         : ${balance}`);
+        console.log(tr)
         assert(balance == 0);
     });
 
-    it("Should call Aave from trusty", async function() {
+    xit("Should call Aave from trusty", async function() {
         this.timeout(1000000);
 
         // Get the latest LendingPool contract address
@@ -109,7 +112,6 @@ contract("trustyAaveProxy", accounts => {
                 gasPrice: web3.utils.toHex(20000000000),
             }
         );
-
         const up = await userProxy.at(userProxyAddress);
         let tr = await up.depositFunds(
             ethAddress, 
@@ -136,7 +138,7 @@ contract("trustyAaveProxy", accounts => {
                 gasPrice: web3.utils.toHex(20000000000),
             }
         );
-        // console.log(tr.receipt.rawLogs);
+        console.log(tr);
         console.log("Deposited 1 Ether")
 
         let balanceAfterAaveDeposit = await web3.eth.getBalance(up.address)
@@ -144,79 +146,93 @@ contract("trustyAaveProxy", accounts => {
 
         let ethContractBalance = await aETHContract.methods.balanceOf(up.address).call()
         console.log(`Balance in the Aave ETH contract: ${ethContractBalance}`)
+        
+        const aaveCollateralManagerAddress = await t.getAaveCollateralManager(
+          {
+              from: myWalletAddress,
+              gasLimit: web3.utils.toHex(150000),
+              gasPrice: web3.utils.toHex(20000000000),
+          }
+        );
+
+        let aaveCollateralManagerContractBalanceInAToken = await aETHContract.methods.balanceOf(aaveCollateralManagerAddress).call()
+        console.log(`Balance in the Aave ETH contract for CM: ${aaveCollateralManagerContractBalanceInAToken}`)
+
+        let aaveCollateralManagerContractBalance = await web3.eth.getBalance(aaveCollateralManagerAddress)
+        console.log(`Balance left in CM:                     ${aaveCollateralManagerContractBalance}`)
 
 
         // Borrowing Dai using the deposited Eth as collateral
-        tr = await ta.borrow(
-            daiAddress,
-            daiAmountinWei,
-            interestRateMode,
-            referralCode,
-            {
-                from: myWalletAddress,
-                gasLimit: web3.utils.toHex(1500000),
-                gasPrice: web3.utils.toHex(20000000000)
-            }
-        );
-        console.log(`Borrowed ${daiAmountinWei} Dai amount in Wei`)
-        let d = await lpContract.methods.getUserAccountData(up.address).call()
-        console.log(d);
-
-        // // await delay(2000);
-        console.log(`Paying back ${daiAmountinWei} gwei`)
-        tr = await ta.repay(
-            daiAddress,
-            daiAmountinWei,
-            myWalletAddress,
-            {
-                from: myWalletAddress,
-                gasLimit: web3.utils.toHex(15000000),
-                gasPrice: web3.utils.toHex(200000000000),
-            }
-        );
-        console.log(tr)
-        console.log("Repaid the borrow")
-        // d = await lpContract.methods.getUserAccountData(up.address).call()
+        // tr = await ta.borrow(
+        //     daiAddress,
+        //     daiAmountinWei,
+        //     interestRateMode,
+        //     referralCode,
+        //     {
+        //         from: myWalletAddress,
+        //         gasLimit: web3.utils.toHex(1500000),
+        //         gasPrice: web3.utils.toHex(20000000000)
+        //     }
+        // );
+        // console.log(`Borrowed ${daiAmountinWei} Dai amount in Wei`)
+        // let d = await lpContract.methods.getUserAccountData(up.address).call()
         // console.log(d);
 
-        let balanceBeforeRedeem = await aETHContract.methods.balanceOf(up.address).call()
-        
-        // account for slippage from borrow repayment
-        balanceBeforeRedeem = parseInt(balanceBeforeRedeem) - 30000000000000
-        balanceBeforeRedeem = balanceBeforeRedeem.toString()
-        console.log(`Redeeming the balance of: ${balanceBeforeRedeem}`)
+        // // // await delay(2000);
+        // console.log(`Paying back ${daiAmountinWei} gwei`)
+        // tr = await ta.repay(
+        //     daiAddress,
+        //     daiAmountinWei,
+        //     myWalletAddress,
+        //     {
+        //         from: myWalletAddress,
+        //         gasLimit: web3.utils.toHex(15000000),
+        //         gasPrice: web3.utils.toHex(200000000000),
+        //     }
+        // );
+        // console.log(tr)
+        // console.log("Repaid the borrow")
+        // // d = await lpContract.methods.getUserAccountData(up.address).call()
+        // // console.log(d);
 
-        tr = await ta.redeem(
-            aETHToken,
-            balanceBeforeRedeem,
-            {
-                from: myWalletAddress,
-                gasLimit: web3.utils.toHex(15000000),
-                gasPrice: web3.utils.toHex(200000000000),
-            }
-        );
-        let balanceAfterRedeem = await aETHContract.methods.balanceOf(up.address).call()
-        console.log(`Balance left:             ${balanceAfterRedeem}`)
+        // let balanceBeforeRedeem = await aETHContract.methods.balanceOf(up.address).call()
 
-        let balanceInUserProxyAfterRedeem = await web3.eth.getBalance(up.address)
-        console.log(`Balance in UserProxy:                     ${balanceInUserProxyAfterRedeem}`)
-        console.log(tr)
-        assert(balanceAfterRedeem < balanceBeforeRedeem);
+        // // account for slippage from borrow repayment
+        // balanceBeforeRedeem = parseInt(balanceBeforeRedeem) - 30000000000000
+        // balanceBeforeRedeem = balanceBeforeRedeem.toString()
+        // console.log(`Redeeming the balance of: ${balanceBeforeRedeem}`)
+
+        // tr = await ta.redeem(
+        //     aETHToken,
+        //     balanceBeforeRedeem,
+        //     {
+        //         from: myWalletAddress,
+        //         gasLimit: web3.utils.toHex(15000000),
+        //         gasPrice: web3.utils.toHex(200000000000),
+        //     }
+        // );
+        // let balanceAfterRedeem = await aETHContract.methods.balanceOf(up.address).call()
+        // console.log(`Balance left:             ${balanceAfterRedeem}`)
+
+        // let balanceInUserProxyAfterRedeem = await web3.eth.getBalance(up.address)
+        // console.log(`Balance in UserProxy:                     ${balanceInUserProxyAfterRedeem}`)
+        // console.log(tr)
+        // assert(balanceAfterRedeem < balanceBeforeRedeem);
 
 
-        let agentScore = await ta.getAgentScore({
-                from: myWalletAddress,
-                gasLimit: web3.utils.toHex(15000000),
-                gasPrice: web3.utils.toHex(200000000000),
-            });
-        console.log(`Based on the tested actions, the test agent has achieved a score of ${agentScore}. `);
-        console.log(`Keep performing desired Aave actions to further reduce your collateral!`);
+        // let agentScore = await ta.getAgentScore({
+        //         from: myWalletAddress,
+        //         gasLimit: web3.utils.toHex(15000000),
+        //         gasPrice: web3.utils.toHex(200000000000),
+        //     });
+        // console.log(`Based on the tested actions, the test agent has achieved a score of ${agentScore}. `);
+        // console.log(`Keep performing desired Aave actions to further reduce your collateral!`);
 
-        await ta.curate({
-            from: myWalletAddress,
-            gasLimit: web3.utils.toHex(15000000),
-            gasPrice: web3.utils.toHex(200000000000),
-        });
+        // await ta.curate({
+        //     from: myWalletAddress,
+        //     gasLimit: web3.utils.toHex(15000000),
+        //     gasPrice: web3.utils.toHex(200000000000),
+        // });
     });
 
     xit("Should call Aave directly from javascript", async function() {

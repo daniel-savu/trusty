@@ -5,6 +5,7 @@ import "@nomiclabs/buidler/console.sol";
 import "./trustyAaveProxy.sol";
 import "./LTCR.sol";
 import "./UserProxy.sol";
+import "./AaveCollateralManager.sol";
 // import "node_modules/@studydefi/money-legos/compound/contracts/ICEther.sol";
 
 
@@ -16,6 +17,7 @@ contract trusty {
     mapping (address => address) userProxyToUserAddress;
     mapping (address => trustyAaveProxy) agentAaveContracts;
     LTCR aaveLTCR;
+    AaveCollateralManager aaveCollateralManager;
     mapping (address => bool) isAgentInitialized;
 
     uint8[] aaveLayers;
@@ -26,6 +28,7 @@ contract trusty {
     constructor() public {
         aaveLTCR = new LTCR();
         initializeAaveLTCR();
+        aaveCollateralManager = new AaveCollateralManager(address(this));
     }
 
     function initializeAaveLTCR() private {
@@ -125,7 +128,7 @@ contract trusty {
 
     function initializeAaveProxy() private {
         UserProxy userProxy = userAddressToUserProxy[msg.sender];
-        trustyAaveProxy aaveProxy = new trustyAaveProxy(msg.sender, address(aaveLTCR), address(this), address(userProxy));
+        trustyAaveProxy aaveProxy = new trustyAaveProxy(msg.sender, address(aaveLTCR), address(this), address(userProxy), address(aaveCollateralManager));
         agentAaveContracts[msg.sender] = aaveProxy;
         aaveLTCR.addAuthorisedContract(address(aaveProxy));
         aaveProxy.registerAgentToLTCR();
@@ -135,6 +138,10 @@ contract trusty {
     function getAaveProxy()  public view returns (trustyAaveProxy) {
         require(isAgentInitialized[msg.sender], "No proxy contract exists for caller. You need to call addAgent first.");
         return agentAaveContracts[msg.sender];
+    }
+
+    function getAaveCollateralManager()  public view returns (AaveCollateralManager) {
+        return aaveCollateralManager;
     }
 
     function getUserProxy(address userAddress) public view returns (address) {
