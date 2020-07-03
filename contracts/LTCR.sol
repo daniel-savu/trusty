@@ -2,6 +2,7 @@ pragma solidity ^0.5.0;
 
 // import "./InitializableAdminUpgradeabilityProxy.sol";
 import "@openzeppelin/contracts/ownership/Ownable.sol";
+import "@nomiclabs/buidler/console.sol";
 
 contract LTCR is Ownable {
     address[] authorisedContracts;
@@ -10,17 +11,17 @@ contract LTCR is Ownable {
     uint256 _decimals; // decimals to calculate collateral factor
 
     // Implementation of L = (lower, upper, factor)
-    uint8[] _layers; // array of layers, e.g. {1,2,3,4}
-    mapping (uint8 => uint256) _lower; // lower bound of layer
-    mapping (uint8 => uint256) _upper; // upper bound of layer
-    mapping (uint8 => uint256) _factors; // factor of layer
+    uint[] _layers; // array of layers, e.g. {1,2,3,4}
+    mapping (uint => uint256) _lower; // lower bound of layer
+    mapping (uint => uint256) _upper; // upper bound of layer
+    mapping (uint => uint256) _factors; // factor of layer
 
     // Implementation of the relevant agreement parameters A = (phi, payment, score, deposits)
     mapping (uint256 => uint256) _rewards; // reward (score) for performing an action
     mapping (address => uint256) _deposits; // amount of deposit
 
     // Implementation of the registry
-    mapping (uint256 => mapping (address => uint8)) _assignments; // layer assignment by round and agent
+    mapping (uint256 => mapping (address => uint)) _assignments; // layer assignment by round and agent
     mapping (uint256 => mapping (address => uint256)) _scores; // score by round and agent
     uint256 _round; // current round in the protocol
     
@@ -40,12 +41,15 @@ contract LTCR is Ownable {
         _end = block.number + _blockperiod;
     }
 
-    function addAuthorisedContract(address authorisedContract) public onlyOwner {
+    function addAuthorisedContract(address authorisedContract) public onlyAuthorised {
         authorisedContracts.push(authorisedContract);
     }
 
     modifier onlyAuthorised() {
         bool isAuthorised = false;
+        if(isOwner()) {
+            isAuthorised = true;
+        }
         for (uint i = 0; i < authorisedContracts.length; i++) {
             if(authorisedContracts[i] == msg.sender) {
                 isAuthorised = true;
@@ -60,21 +64,21 @@ contract LTCR is Ownable {
     // ### LAYERS ###
     // ##############
 
-    function getLayers() public view returns(uint8[] memory) {
+    function getLayers() public view returns(uint[] memory) {
         return _layers;
     }
 
-    function setLayers(uint8[] memory layers) public returns (bool) {
-         // set layers
-        _layers = layers;
-        return true;
+    function addLayer(uint layer) public {
+        console.log("ain addLayer");
+        _layers.push(layer);
+        console.log(_layers.length);
     }
 
     // ##################
     // ### Collateral ###
     // ##################
 
-    function setCollateral(uint256 mincollateral) public onlyAuthorised returns (bool) {
+    function setCollateral(uint256 mincollateral) public returns (bool) {
         _minCollateral = mincollateral;
         return true;
     }
@@ -83,18 +87,18 @@ contract LTCR is Ownable {
     // ### FACTOR ###
     // ##############
     function getAgentFactor(address agent) public view returns (uint256) {      
-        uint8 assignment = getAssignment(agent);
+        uint assignment = getAssignment(agent);
 
         require(assignment > 0, "agent not assigned to layer");
 
         return _factors[assignment];
     }
 
-    function getFactor(uint8 layer) public view returns (uint256) {
+    function getFactor(uint layer) public view returns (uint256) {
         return _factors[layer];
     }
 
-    function setFactor(uint8 layer, uint256 factor) public onlyAuthorised returns (bool) {
+    function setFactor(uint layer, uint256 factor) public onlyAuthorised returns (bool) {
         // require(factor >= (10 ** _decimals), "factor needs to be above or equal to 1.0");
         // require(layer > 0, "layer 0 is reserved");
         _factors[layer] = factor;
@@ -118,11 +122,11 @@ contract LTCR is Ownable {
     // ### BOUNDS ###
     // ###############
 
-    function getBounds(uint8 layer) public view returns (uint256, uint256) {
+    function getBounds(uint layer) public view returns (uint256, uint256) {
         return (_lower[layer], _upper[layer]);
     }
 
-    function setBounds(uint8 layer, uint256 lower, uint256 upper) public onlyAuthorised returns (bool) {
+    function setBounds(uint layer, uint256 lower, uint256 upper) public onlyAuthorised returns (bool) {
         _lower[layer] = lower;
         _upper[layer] = upper;
 
@@ -137,13 +141,13 @@ contract LTCR is Ownable {
     // ### AGENT REGISTRY ###
     // ######################
 
-    function getAssignment(address agent) public view returns(uint8 assignment) {
+    function getAssignment(address agent) public view returns(uint assignment) {
         // check if agent is registered
         if (_agents[agent]) {
             // check if agent is assigned to a layer in the current round        
             if (_assignments[_round][agent] == 0) {
                 // check if the agent was assigned to a layer in previous rounds
-                for (uint8 i = 1; i < _layers.length && i < _round; i++) {
+                for (uint i = 1; i < _layers.length && i < _round; i++) {
                     if (_assignments[_round - i][agent] > i) {
                         return _assignments[_round - i][agent] - i;
                     }
@@ -158,7 +162,7 @@ contract LTCR is Ownable {
     }
 
     function getAgentCollateral(address agent) public view returns (uint256) {
-        uint8 assignment = getAssignment(agent);
+        uint assignment = getAssignment(agent);
 
         require(assignment > 0, "agent not assigned to layer");
 
@@ -166,7 +170,7 @@ contract LTCR is Ownable {
     }
 
     function getScore(address agent) public view returns (uint256) {
-        uint8 assignment = getAssignment(agent);
+        uint assignment = getAssignment(agent);
 
         require(assignment > 0, "agent not assigned to layer");
 
@@ -174,7 +178,10 @@ contract LTCR is Ownable {
     }
 
     function registerAgent(address agent, uint256 collateral) public returns (bool) {
-        require(collateral >= _minCollateral * (_factors[_layers[0]] / (10 ** _decimals)), "too little collateral");
+        console.log(collateral);
+        console.log(_minCollateral);
+        console.log(_layers.length);
+        // require(collateral >= _minCollateral * (_factors[_layers[0]] / (10 ** _decimals)), "too little collateral");
         
         // register agent
         _agents[agent] = true;
@@ -200,7 +207,7 @@ contract LTCR is Ownable {
         _scores[_round][agent] += _rewards[action];
 
         // asignment in the current round
-        uint8 assignment = getAssignment(agent);
+        uint assignment = getAssignment(agent);
 
         require(assignment > 0, "agent not assigned to layer");
 

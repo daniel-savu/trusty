@@ -3,9 +3,9 @@ pragma solidity ^0.5.0;
 import "@studydefi/money-legos/compound/contracts/ICEther.sol";
 import "@nomiclabs/buidler/console.sol";
 import "./LTCR.sol";
-import "./trusty.sol";
+import "./Trusty.sol";
 
-contract trusty_compound {
+contract TrustyCompound {
 
     address constant CEtherAddress = 0x4Ddc2D193948926D02f9B1fE9e1daa0718270ED5;
     LTCR ltcr;
@@ -17,7 +17,9 @@ contract trusty_compound {
         uint256[] memory layerUpperBounds
     ) public returns (bool) { //should be onlyOwner in the future
         ltcr = new LTCR();
-        ltcr.setLayers(layers);
+        for(uint i = 0; i < layers.length; i++) {
+            ltcr.addLayer(layers[i]);
+        }
         setFactors(layers, layerFactors);
         setBounds(layers, layerLowerBounds, layerUpperBounds);
         return true;

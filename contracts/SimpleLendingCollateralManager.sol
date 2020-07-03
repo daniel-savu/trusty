@@ -9,7 +9,7 @@ import "./upgradeabilityProxy/Proxy.sol";
 import "./upgradeabilityProxy/UpgradeabilityStorage.sol";
 
 
-contract AaveCollateralManager is Proxy, UpgradeabilityStorage {
+contract SimpleLendingCollateralManager is Proxy, UpgradeabilityStorage {
 // can be called by any address
 // however, Trusty addresses may receive a collateral discount
     address targetAddress;
@@ -33,7 +33,6 @@ contract AaveCollateralManager is Proxy, UpgradeabilityStorage {
         _implementation = implementation;
         emit Upgraded(version, implementation);
     }
-
 
     // function() external payable {
     //     assembly {
@@ -110,65 +109,7 @@ contract AaveCollateralManager is Proxy, UpgradeabilityStorage {
     }
 
     function callNeedsCollateral(address target, bytes memory abiEncoding) private view returns (bool) {
-        // check that the target is the Aave LendingPool and that abiEncoding matches the signature of `borrow`
-        // first decode abiEncoding to get parameters, the use those params to build our own encoding with signature
-        address LendingPoolAddress = getLendingPoolAddress();
-
-        (address reserve, uint256 amount, uint256 interestRateMode, uint16 referralCode) = abi.decode(abiEncoding, (address, uint256, uint256, uint16));
-
-        bytes memory abiEncodingWhichRequiresCollateral = abi.encodeWithSignature(
-                "borrow(address,uint256,uint256,uint16)",
-                reserve,
-                amount,
-                interestRateMode,
-                referralCode
-            );
-
-        if(keccak256(abiEncodingWhichRequiresCollateral) == keccak256(abiEncoding) && target == LendingPoolAddress) {
-            return true;
-        }
         return false;
-    }
-
-    function getLendingPoolAddress() private view returns (address) {
-        return ILendingPoolAddressesProvider(LendingPoolAddressesProviderAddress).getLendingPool();
-    }
-
-    function getPriceOracleAddress() private view returns (address) {
-        return ILendingPoolAddressesProvider(LendingPoolAddressesProviderAddress).getPriceOracle();
-    }
-
-    function getTotalCollateral() public returns (uint256) {
-        address LendingPoolAddress = getLendingPoolAddress();
-        bytes memory abiEncoding = abi.encodeWithSignature("getUserAccountData(address)", msg.sender);
-        (bool success, bytes memory result) = LendingPoolAddress.call(abiEncoding);
-        (
-            uint256 totalLiquidityETH,
-            uint256 totalCollateralETH,
-            uint256 totalBorrowsETH,
-            uint256 totalFeesETH,
-            uint256 availableBorrowsETH,
-            uint256 currentLiquidationThreshold,
-            uint256 ltv,
-            uint256 healthFactor
-        ) = abi.decode(
-                result,
-                (uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256)
-            );
-        return totalCollateralETH;
-    }
-
-    function getWorthOfLoan(address reserve, uint256 amount) private view returns (uint256) {
-        address priceOracleAddress = getPriceOracleAddress();
-        IPriceOracleGetter priceOracle = IPriceOracleGetter(priceOracleAddress);
-        uint256 price = priceOracle.getAssetPrice(reserve);
-        return price * amount;
-    }
-
-    function getReserveAndAmount(bytes memory abiEncoding) private view returns (address, uint256) {
-        (address reserve, uint256 amount, uint256 interestRateMode, uint16 referralCode) = abi.decode(abiEncoding, (address, uint256, uint256, uint16));
-        return (reserve, amount);
-
     }
 
 }

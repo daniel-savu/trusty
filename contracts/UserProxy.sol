@@ -3,7 +3,7 @@ pragma solidity ^0.5.0;
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@studydefi/money-legos/aave/contracts/ILendingPoolAddressesProvider.sol";
-import "./trusty.sol";
+import "./Trusty.sol";
 import "./LTCR.sol";
 
 
@@ -17,18 +17,18 @@ contract UserProxy is Ownable {
     address constant LendingPoolAddressesProviderAddress = 0x24a42fD28C976A61Df5D00D0599C34c4f90748c8;
     mapping(address => int256) agentFundsInPool;
     LTCR[] ltcrs;
-    trusty trustyContract;
+    Trusty trustyContract;
 
 
     constructor(address agent, address payable trustyAddress) public {
-        trustyContract = trusty(trustyAddress);
+        trustyContract = Trusty(trustyAddress);
         addAuthorisedContract(msg.sender);
         agentOwner = agent;
     }
 
     function() external payable {}
 
-    function addAuthorisedContract(address authorisedContract) public onlyOwner {
+    function addAuthorisedContract(address authorisedContract) public onlyAuthorised {
         authorisedContracts.push(authorisedContract);
     }
 
@@ -50,6 +50,9 @@ contract UserProxy is Ownable {
 
     modifier onlyAuthorised() {
         bool isAuthorised = false;
+        if(isOwner()) {
+            isAuthorised = true;
+        }
         for (uint i = 0; i < authorisedContracts.length; i++) {
             if(authorisedContracts[i] == msg.sender) {
                 isAuthorised = true;

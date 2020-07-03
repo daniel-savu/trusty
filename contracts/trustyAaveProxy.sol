@@ -6,12 +6,14 @@ import "@studydefi/money-legos/aave/contracts/ILendingPool.sol";
 import "./LTCR.sol";
 import "@studydefi/money-legos/aave/contracts/ILendingPoolAddressesProvider.sol";
 import "@nomiclabs/buidler/console.sol";
-import "./trusty.sol";
+import "./Trusty.sol";
 import "./UserProxy.sol";
 import "./AaveCollateralManager.sol";
+import "./UserProxyFactory.sol";
+
 // import "./InitializableAdminUpgradeabilityProxy.sol";
 
-contract trustyAaveProxy is Ownable {
+contract TrustyAaveProxy is Ownable {
     address agentOwner;
     address constant LendingPoolAddressesProviderAddress = 0x24a42fD28C976A61Df5D00D0599C34c4f90748c8;
     address constant aETHAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -19,6 +21,7 @@ contract trustyAaveProxy is Ownable {
     address constant daiAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     LTCR ltcr;
     AaveCollateralManager aaveCollateralManager;
+    UserProxyFactory userProxyFactory;
 
     uint256 depositAction;
     uint256 borrowAction;
@@ -26,18 +29,17 @@ contract trustyAaveProxy is Ownable {
     uint256 liquidationCallAction;
     uint256 flashLoanAction;
     uint256 redeemAction;
-    trusty trustyContract;
     UserProxy userProxy;
 
     constructor(
         address agent,
         address ltcrAddress,
-        address payable trustyAddress,
+        address payable userProxyFactoryAddress,
         address payable userProxyAddress,
         address payable aaveCollateralManagerAddress
     ) public {
         agentOwner = agent;
-        trustyContract = trusty(trustyAddress);
+        userProxyFactory = UserProxyFactory(userProxyFactoryAddress);
         userProxy = UserProxy(userProxyAddress);
         ltcr = LTCR(ltcrAddress);
         aaveCollateralManager = AaveCollateralManager(aaveCollateralManagerAddress);
@@ -52,8 +54,8 @@ contract trustyAaveProxy is Ownable {
     function() external payable {}
 
     function registerAgentToLTCR() public onlyOwner {
-        console.log(agentOwner);
         ltcr.registerAgent(agentOwner, 100);
+        console.log("registered agent");
     }
 
     function curate() public {
@@ -129,7 +131,7 @@ contract trustyAaveProxy is Ownable {
 
     function repay(address reserve, uint256 amount, address onBehalfOf) public {
         // repay loan using funds deposited in userProxy
-        address agentRecipient = trustyContract.findUserProxy(onBehalfOf);
+        address agentRecipient = userProxyFactory.findUserProxy(onBehalfOf);
         address LendingPoolAddress = getLendingPoolAddress();
         bytes memory abiEncoding = abi.encodeWithSignature(
             "repay(address,uint256,address)",
@@ -161,7 +163,7 @@ contract trustyAaveProxy is Ownable {
         //     LendingPoolAddress,
         //     abiEncoding
         // );
-        aaveCollateralManager.setTarget(LendingPoolAddress);
+        aaveCollateralManager._upgradeTo(1, address(uint160(address(LendingPoolAddress))));
         bool success = userProxy.proxyCall(address(aaveCollateralManager), abiEncoding);
         require(success, "flashLoan failed");
         ltcr.update(agentOwner, flashLoanAction);
