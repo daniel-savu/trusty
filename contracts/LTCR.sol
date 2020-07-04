@@ -32,7 +32,7 @@ contract LTCR is Ownable {
     uint256 _end; // end of period
 
     constructor() public {
-        addAuthorisedContract(msg.sender);
+        // addAuthorisedContract(msg.sender);
         _decimals = 3; // e.g. a factor of 1500 is equal to 1.5 times the collateral
         _round = 0; // init rounds
         
@@ -46,17 +46,17 @@ contract LTCR is Ownable {
     }
 
     modifier onlyAuthorised() {
-        bool isAuthorised = false;
-        if(isOwner()) {
-            isAuthorised = true;
-        }
-        for (uint i = 0; i < authorisedContracts.length; i++) {
-            if(authorisedContracts[i] == msg.sender) {
-                isAuthorised = true;
-                break;
-            }
-        }
-        require(isAuthorised == true, "Caller is not authorised to perform this action");
+        // bool isAuthorised = false;
+        // if(isOwner()) {
+        //     isAuthorised = true;
+        // }
+        // for (uint i = 0; i < authorisedContracts.length; i++) {
+        //     if(authorisedContracts[i] == msg.sender) {
+        //         isAuthorised = true;
+        //         break;
+        //     }
+        // }
+        // require(isAuthorised == true, "Caller is not authorised to perform this action");
         _;
     }
     
@@ -68,19 +68,18 @@ contract LTCR is Ownable {
         return _layers;
     }
 
-    function addLayer(uint layer) public {
-        console.log("ain addLayer");
-        _layers.push(layer);
-        console.log(_layers.length);
+    function setLayers(uint8[] memory layers) public returns (bool) {
+         // set layers
+        _layers = layers;
+        return true;
     }
 
     // ##################
     // ### Collateral ###
     // ##################
 
-    function setCollateral(uint256 mincollateral) public returns (bool) {
+    function setCollateral(uint256 mincollateral) public {
         _minCollateral = mincollateral;
-        return true;
     }
 
     // ##############
@@ -178,10 +177,7 @@ contract LTCR is Ownable {
     }
 
     function registerAgent(address agent, uint256 collateral) public returns (bool) {
-        console.log(collateral);
-        console.log(_minCollateral);
-        console.log(_layers.length);
-        // require(collateral >= _minCollateral * (_factors[_layers[0]] / (10 ** _decimals)), "too little collateral");
+        require(collateral >= _minCollateral * (_factors[_layers[0]] / (10 ** _decimals)), "too little collateral");
         
         // register agent
         _agents[agent] = true;

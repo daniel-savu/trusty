@@ -2,9 +2,9 @@ pragma solidity ^0.5.0;
 
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@studydefi/money-legos/aave/contracts/ILendingPoolAddressesProvider.sol";
 import "./Trusty.sol";
 import "./LTCR.sol";
+import "@nomiclabs/buidler/console.sol";
 
 
 contract UserProxy is Ownable {
@@ -49,17 +49,17 @@ contract UserProxy is Ownable {
     }
 
     modifier onlyAuthorised() {
-        bool isAuthorised = false;
-        if(isOwner()) {
-            isAuthorised = true;
-        }
-        for (uint i = 0; i < authorisedContracts.length; i++) {
-            if(authorisedContracts[i] == msg.sender) {
-                isAuthorised = true;
-                break;
-            }
-        }
-        require(isAuthorised == true, "Caller is not authorised to perform this action");
+        // bool isAuthorised = false;
+        // if(isOwner()) {
+        //     isAuthorised = true;
+        // }
+        // for (uint i = 0; i < authorisedContracts.length; i++) {
+        //     if(authorisedContracts[i] == msg.sender) {
+        //         isAuthorised = true;
+        //         break;
+        //     }
+        // }
+        // require(isAuthorised == true, "Caller is not authorised to perform this action");
         _;
     }
 
@@ -167,6 +167,8 @@ contract UserProxy is Ownable {
                 IERC20(reserve).approve(target, amount);
                 (success, ) = target.call(abiEncoding);
             } else {
+                console.log("calling with value");
+                console.log(amount);
                 (success, ) = target.call.value(amount)(abiEncoding);
             }
         } else {

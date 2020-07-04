@@ -2,9 +2,7 @@ pragma solidity ^0.5.0;
 
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@studydefi/money-legos/aave/contracts/ILendingPool.sol";
 import "./LTCR.sol";
-import "@studydefi/money-legos/aave/contracts/ILendingPoolAddressesProvider.sol";
 import "@nomiclabs/buidler/console.sol";
 import "./Trusty.sol";
 import "./UserProxy.sol";
@@ -37,12 +35,14 @@ contract TrustySimpleLendingProxy is Ownable {
         address ltcrAddress,
         address payable userProxyFactoryAddress,
         address payable userProxyAddress,
-        address payable simpleLendingCollateralManagerAddress
+        address payable simpleLendingCollateralManagerAddress,
+        address payable trustyAddress
     ) public {
         agentOwner = agent;
         userProxyFactory = UserProxyFactory(userProxyFactoryAddress);
         userProxy = UserProxy(userProxyAddress);
         ltcr = LTCR(ltcrAddress);
+        trusty = Trusty(trustyAddress);
         simpleLendingCollateralManager = SimpleLendingCollateralManager(simpleLendingCollateralManagerAddress);
         depositAction = 1;
         borrowAction = 2;
@@ -54,7 +54,7 @@ contract TrustySimpleLendingProxy is Ownable {
 
     function() external payable {}
 
-    function registerAgentToLTCR() public onlyOwner {
+    function registerAgentToLTCR() public {
         console.log(agentOwner);
         ltcr.registerAgent(agentOwner, 100);
     }
@@ -77,19 +77,23 @@ contract TrustySimpleLendingProxy is Ownable {
     // LendingPool contract
 
     function deposit(address reserve, uint256 amount) public {
+        console.log("in trustySLProxy");
+        console.log(reserve);
+        console.log(amount);
         address SimpleLendingAddress = trusty.getSimpleLendingAddress();
         bytes memory abiEncoding = abi.encodeWithSignature(
             "deposit(address,uint256)",
             reserve,
             amount
         );
-        // bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
-        //     "makeCall(address,bytes)",
-        //     SimpleLendingAddress,
-        //     abiEncoding
-        // );
-        simpleLendingCollateralManager._upgradeTo(1, address(uint160(address(SimpleLendingAddress))));
-        bool success = userProxy.proxyCall(address(simpleLendingCollateralManager), abiEncoding, reserve, amount);
+        bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
+            "makeCall(address,bytes)",
+            SimpleLendingAddress,
+            abiEncoding
+        );
+        // simpleLendingCollateralManager._upgradeTo(1, address(uint160(address(SimpleLendingAddress))));
+        console.log("upgraded simpleLendingCollateralManager address");
+        bool success = userProxy.proxyCall(address(simpleLendingCollateralManager), collateralManagerAbiEncoding, reserve, amount);
         require(success, "deposit failed");
         // ltcr.update(agentOwner, depositAction);
     }

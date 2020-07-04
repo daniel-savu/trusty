@@ -19,64 +19,64 @@ const TrustySimpleLendingProxy = artifacts.require("TrustySimpleLendingProxy");
 const UserProxyFactory = artifacts.require("UserProxyFactory");
 const userProxy = artifacts.require("UserProxy");
 const LTCR = artifacts.require("LTCR");
+const SimpleLending = artifacts.require("SimpleLending");
 const AaveCollateralManager = artifacts.require("AaveCollateralManager");
 
 const privateKey = "01ad2f5ee476f3559b0d2eb8ec22968e847f0dcf3e1fc7ec02e57ecce5000548";
 web3.eth.accounts.wallet.add('0x' + privateKey);
 const myWalletAddress = web3.eth.accounts.wallet[0].address;
 
-contract("TrustyAaveProxy", accounts => {
-    const referralCode = '0'
-    const ethAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
-    const ethAmountInWei = web3.utils.toWei('1', 'ether')
-    const aETHToken = '0x3a3A65aAb0dd2A17E3F1947bA16138cd37d08c04'
-    const aETHContract = new web3.eth.Contract(ATokenABI, aETHToken)
-    const daiAddress = '0x6B175474E89094C44Da98b954EedeAC495271d0F' // mainnet
-    const daiAmountinWei = web3.utils.toWei("0.1", "ether")
-    const interestRateMode = 2 // variable rate
-    const lpAddressProviderAddress = '0x24a42fD28C976A61Df5D00D0599C34c4f90748c8'
-    const lpAddressProviderContract = new web3.eth.Contract(LendingPoolAddressesProviderABI, lpAddressProviderAddress)
+const ethAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
+const ethAmountInWei = web3.utils.toWei('1', 'ether')
+const aETHToken = '0x3a3A65aAb0dd2A17E3F1947bA16138cd37d08c04'
+const aETHContract = new web3.eth.Contract(ATokenABI, aETHToken)
 
-    async function initializeAaveLTCR(trusty: typeof Trusty) {
-        const aaveLTCRAddress = await trusty.getAaveLTCR();
+contract("SimpleLending Protocol", accounts => {
+
+    async function initializeSimpleLendingLTCR(trusty: typeof Trusty) {
+        const simpleLendingLTCRAddress = await trusty.getSimpleLendingLTCR();
         // const aaveLTCRAddress = await trusty.getAaveLTCR({
         //     from: myWalletAddress,
         //     gasLimit: web3.utils.toHex(150000),
         //     gasPrice: web3.utils.toHex(20000000000),
         // });
-        const aaveLTCRContract = await LTCR.at(aaveLTCRAddress);
+        const simpleLendingLTCRContractTruffle = await LTCR.at(simpleLendingLTCRAddress);
+        const simpleLendingLTCRContract = new web3.eth.Contract(simpleLendingLTCRContractTruffle.abi, simpleLendingLTCRAddress)
 
-        await aaveLTCRContract.setCollateral(1);
+        console.log(simpleLendingLTCRContract.methods.setCollateral);
+        // await simpleLendingLTCRContract.methods.setCollateral(1).call();
+        
+        // let data = simpleLendingLTCRContract.methods.setCollateral(1).encodeABI();
+        // await web3.eth.sendTransaction({
+        //     from: accs[0],
+        //     to: simpleLendingLTCRContract.address,
+        //     data: data,
+        //     gasLimit: web3.utils.toHex(150000),
+        //     gasPrice: web3.utils.toHex(20000000000),
+        // });
 
-        let aaveLayers = [1, 2, 3, 4, 5];
-        let aaveLayerFactors = [2000, 1800, 1500, 1250, 1100]; // 153% is the highest collateral ratio in Aave
-        let aaveLayerLowerBounds = [0, 20, 40, 60, 80];
-        let aaveLayerUpperBounds = [25, 45, 65, 85, 10000];
+        await simpleLendingLTCRContractTruffle.setCollateral(1);
+        let simpleLendingLayers = [1, 2, 3, 4, 5];
+        let simpleLendingLayerFactors = [2000, 1800, 1500, 1250, 1100]; // 153% is the highest collateral ratio in Aave
+        let simpleLendingLayerLowerBounds = [0, 20, 40, 60, 80];
+        let simpleLendingLayerUpperBounds = [25, 45, 65, 85, 10000];
 
-        let txConfirmation;
-        // const aaveLTCRContractWeb3 = new web3.eth.Contract(aaveLTCRContract.abi, aaveLTCRAddress)
-        for(let i = 0; i < aaveLayers.length; i++) {
-            txConfirmation = await aaveLTCRContract.addLayer(aaveLayers[i])
-            // txConfirmation = await aaveLTCRContract.addLayer.sendTransaction(aaveLayers[i]);
-            console.log(txConfirmation);
-        }
+        await simpleLendingLTCRContractTruffle.addLayers(simpleLendingLayers.length);
 
         console.log("the layers are:");
-        let LTCRLayers = await aaveLTCRContract.getLayers();
-        console.log(LTCRLayers);
+        // let LTCRLayers = await simpleLendingLTCRContract.getLayers();
+        // console.log(LTCRLayers);
 
-        for(let i = 0; i < aaveLayers.length; i++) {
-            await aaveLTCRContract.setFactor(aaveLayers[i], aaveLayerFactors[i]);
+        for(let i = 0; i < simpleLendingLayers.length; i++) {
+            await simpleLendingLTCRContract.setFactor(simpleLendingLayers[i], simpleLendingLayerFactors[i]);
         }
 
-        for(let i = 0; i < aaveLayers.length; i++) {
-            await aaveLTCRContract.setBounds(aaveLayers[i], aaveLayerLowerBounds[i], aaveLayerUpperBounds[i]);
+        for(let i = 0; i < simpleLendingLayers.length; i++) {
+            await simpleLendingLTCRContract.setBounds(simpleLendingLayers[i], simpleLendingLayerLowerBounds[i], simpleLendingLayerUpperBounds[i]);
         }
 
         // setting the reward for each action
-        // ideally, the reward depends on the parameters of the call to Aave
-        // but for now, a certain action will carry a certain score.
-        // The rewards could potentially be decided by the Aave Protocol Governance
+        // ideally, the reward depends on call parameters
         // Mapping of actions to their id:
         const depositAction = 1;
         const borrowAction = 2;
@@ -85,87 +85,72 @@ contract("TrustyAaveProxy", accounts => {
         const flashLoanAction = 5;
         const redeemAction = 6;
         
-        await aaveLTCRContract.setReward(depositAction, 15);
-        await aaveLTCRContract.setReward(borrowAction, 0);
-        await aaveLTCRContract.setReward(repayAction, 5);
-        await aaveLTCRContract.setReward(liquidationCallAction, 10);
-        await aaveLTCRContract.setReward(flashLoanAction, 10);
-        await aaveLTCRContract.setReward(redeemAction, 0);
+        await simpleLendingLTCRContract.setReward(depositAction, 15);
+        await simpleLendingLTCRContract.setReward(borrowAction, 0);
+        await simpleLendingLTCRContract.setReward(repayAction, 5);
+        await simpleLendingLTCRContract.setReward(liquidationCallAction, 10);
+        await simpleLendingLTCRContract.setReward(flashLoanAction, 10);
+        await simpleLendingLTCRContract.setReward(redeemAction, 0);
     }
 
     it("Should deposit to SimpleLending", async function () {
         this.timeout(1000000);
+        let accs = await web3.eth.getAccounts();
         const t = await Trusty.new();
         console.log(`typeof t: ${typeof t}`);
         console.log("deploying trusty");
-        const userProxyFactoryAddress = await t.getUserProxyFactoryAddress({
-            from: myWalletAddress,
-            gasLimit: web3.utils.toHex(150000),
-            gasPrice: web3.utils.toHex(20000000000),
-        });
+        const userProxyFactoryAddress = await t.getUserProxyFactoryAddress();
+        const simpleLendingAddress = await t.getSimpleLendingAddress();
+        const simpleLending = await SimpleLending.at(simpleLendingAddress);
         console.log("deployed trusty");
-        initializeAaveLTCR(t);
+        // initializeSimpleLendingLTCR(t);
         const userProxyFactory = await UserProxyFactory.at(userProxyFactoryAddress);
         let addAgentTx = await userProxyFactory.addAgent();
-        console.log(addAgentTx);
-        // // {
-        // //     from: myWalletAddress,
-        // //     gasLimit: web3.utils.toHex(150000),
-        // //     gasPrice: web3.utils.toHex(20000000000),
-        // // });
 
-        // console.log("added agent");
-        // const trustySimpleLendingProxyAddress = await userProxyFactory.getTrustySimpleLendingProxy();
-        // // const trustySimpleLendingProxyAddress = await userProxyFactory.getTrustySimpleLendingProxy({
-        // //     from: myWalletAddress,
-        // //     gasLimit: web3.utils.toHex(150000),
-        // //     gasPrice: web3.utils.toHex(20000000000),
-        // // });
-        // const trustySimpleLendingProxy = await TrustySimpleLendingProxy.at(trustySimpleLendingProxyAddress);
+        console.log("added agent");
+        const trustySimpleLendingProxyAddress = await userProxyFactory.getTrustySimpleLendingProxy();
+        const trustySimpleLendingProxy = await TrustySimpleLendingProxy.at(trustySimpleLendingProxyAddress);
 
-        // const userProxyAddress = await userProxyFactory.getUserProxy(
-        //     myWalletAddress,
-        //     {
-        //         from: myWalletAddress,
-        //         gasLimit: web3.utils.toHex(150000),
-        //         gasPrice: web3.utils.toHex(20000000000),
-        //     }
-        // );
-        // const up = await userProxy.at(userProxyAddress);
-        // let tr = await up.depositFunds(
-        //     ethAddress,
-        //     ethAmountInWei,
-        //     {
-        //         from: myWalletAddress,
-        //         gasLimit: web3.utils.toHex(1500000),
-        //         gasPrice: web3.utils.toHex(20000000000),
-        //         value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
-        //     }
-        // );
+        const userProxyAddress = await userProxyFactory.getUserProxy(accs[0]);
+        const up = await userProxy.at(userProxyAddress);
+        let tr = await up.depositFunds(
+            ethAddress,
+            ethAmountInWei,
+            {
+                gasLimit: web3.utils.toHex(1500000),
+                gasPrice: web3.utils.toHex(20000000000),
+                value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
+            }
+        );
 
-        // console.log("Deposited funds in UserProxy");
-        // let balanceAfterDeposit = await web3.eth.getBalance(up.address)
-        // console.log(`Balance:                                                    ${balanceAfterDeposit}`)
+        console.log("Deposited funds in UserProxy");
+        let balanceAfterDeposit = await web3.eth.getBalance(up.address)
+        console.log(`Balance:                                                    ${balanceAfterDeposit}`)
 
-        // tr = await trustySimpleLendingProxy.deposit(
-        //     ethAddress,
-        //     ethAmountInWei,
-        //     {
-        //         from: myWalletAddress,
-        //         gasLimit: web3.utils.toHex(1500000),
-        //         gasPrice: web3.utils.toHex(20000000000),
-        //     }
-        // );
+        tr = await trustySimpleLendingProxy.deposit(
+            ethAddress,
+            ethAmountInWei
+        );
 
-        // console.log(tr);
-        // console.log("Deposited 1 Ether")
+        console.log(tr);
+        console.log("Deposited 1 Ether")
 
         // let balanceAfterAaveDeposit = await web3.eth.getBalance(up.address)
         // console.log(`Balance left:                                         ${balanceAfterAaveDeposit}`)
 
-        // let ethContractBalance = await aETHContract.methods.balanceOf(up.address).call()
-        // console.log(`Balance in the Aave ETH contract: ${ethContractBalance}`)
+        // let userSimpleLendingBalance = await simpleLending.getAccountBalance(up.address);
+        // console.log(`Balance in the SimpleLending contract: ${userSimpleLendingBalance}`)
     });
+
+});
+
+contract("TrustyAaveProxy", accounts => {
+    const referralCode = '0'
+    const daiAddress = '0x6B175474E89094C44Da98b954EedeAC495271d0F' // mainnet
+    const daiAmountinWei = web3.utils.toWei("0.1", "ether")
+    const interestRateMode = 2 // variable rate
+    const lpAddressProviderAddress = '0x24a42fD28C976A61Df5D00D0599C34c4f90748c8'
+    const lpAddressProviderContract = new web3.eth.Contract(LendingPoolAddressesProviderABI, lpAddressProviderAddress)
 
     xit("Should take an Aave flashloan using Trusty", async function () {
         // const FlashLoanExecutor = artifacts.require("FlashLoanExecutor");

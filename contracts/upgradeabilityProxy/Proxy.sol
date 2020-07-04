@@ -1,5 +1,7 @@
 pragma solidity ^0.5.0;
 
+import "@nomiclabs/buidler/console.sol";
+
 
 /**
  * @title Proxy
@@ -20,9 +22,12 @@ contract Proxy {
   * This function will return whatever the implementation call returns
   */
     function () payable external {
+        console.log("in proxy fallback:");
+        console.log(address(this));
         address payable _impl = implementation();
         require(_impl != address(0));
-
+        console.log("implementation:");
+        console.log(_impl);
         address payable _innerImpl;
         bytes4 sig;
         address thisAddress = address(this);

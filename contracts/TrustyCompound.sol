@@ -17,9 +17,7 @@ contract TrustyCompound {
         uint256[] memory layerUpperBounds
     ) public returns (bool) { //should be onlyOwner in the future
         ltcr = new LTCR();
-        for(uint i = 0; i < layers.length; i++) {
-            ltcr.addLayer(layers[i]);
-        }
+        ltcr.setLayers(layers);
         setFactors(layers, layerFactors);
         setBounds(layers, layerLowerBounds, layerUpperBounds);
         return true;

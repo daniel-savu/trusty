@@ -1,36 +1,31 @@
 pragma solidity ^0.5.0;
 
-import "./AaveCollateralManager.sol";
 import "./SimpleLendingCollateralManager.sol";
 import "./LTCR.sol";
+import "./Trusty.sol";
 import "./UserProxy.sol";
-import "./TrustyAaveProxy.sol";
 import "./TrustySimpleLendingProxy.sol";
 import "@nomiclabs/buidler/console.sol";
 
 contract UserProxyFactory {
     mapping (address => UserProxy) userAddressToUserProxy;
     mapping (address => address) userProxyToUserAddress;
-    mapping (address => TrustyAaveProxy) agentAaveContracts;
     mapping (address => TrustySimpleLendingProxy) agentSimpleLendingContracts;
 
-    AaveCollateralManager aaveCollateralManager;
-    LTCR aaveLTCR;
     SimpleLendingCollateralManager simpleLendingCollateralManager;
     LTCR simpleLendingLTCR;
+    Trusty trusty;
     mapping (address => bool) isAgentInitialized;
 
 
     constructor(
-        address payable aaveCollateralManagerAddress,
         address payable simpleLendingCollateralManagerAddress,
-        address aaveLTCRAddress,
-        address simpleLendingLTCRAddress
+        address simpleLendingLTCRAddress,
+        address payable trustyAddress
     ) public {
-        aaveCollateralManager = AaveCollateralManager(aaveCollateralManagerAddress);
         simpleLendingCollateralManager = SimpleLendingCollateralManager(simpleLendingCollateralManagerAddress);
-        aaveLTCR = LTCR(aaveLTCRAddress);
         simpleLendingLTCR = LTCR(simpleLendingLTCRAddress);
+        trusty = Trusty(trustyAddress);
     }
 
     function() external payable {}
@@ -38,11 +33,10 @@ contract UserProxyFactory {
     function addAgent() public {
         console.log("in addAgent");
         if (!isAgentInitialized[msg.sender]) {
-            UserProxy userProxy = new UserProxy(msg.sender, address(this));
+            UserProxy userProxy = new UserProxy(msg.sender, address(trusty));
             userAddressToUserProxy[msg.sender] = userProxy;
             userProxyToUserAddress[address(userProxy)] = msg.sender;
-            initializeTrustyAaveProxy();
-            // initializeSimpleLendingProxy();
+            initializeSimpleLendingProxy();
             // add other protocol initializations here
             // such as initializeCompoundProxy when done
             isAgentInitialized[msg.sender] = true;
@@ -53,21 +47,6 @@ contract UserProxyFactory {
         return userProxyToUserAddress[userProxyAddress] != address(0);
     }
 
-    function initializeTrustyAaveProxy() private {
-        UserProxy userProxy = userAddressToUserProxy[msg.sender];
-        TrustyAaveProxy trustyAaveProxy = new TrustyAaveProxy(
-            msg.sender,
-            address(aaveLTCR),
-            address(this),
-            address(userProxy),
-            address(aaveCollateralManager)
-        );
-        agentAaveContracts[msg.sender] = trustyAaveProxy;
-        aaveLTCR.addAuthorisedContract(address(trustyAaveProxy));
-        userProxy.addAuthorisedContract(address(agentAaveContracts[msg.sender]));
-        trustyAaveProxy.registerAgentToLTCR();
-    }
-
     function initializeSimpleLendingProxy() private {
         UserProxy userProxy = userAddressToUserProxy[msg.sender];
         TrustySimpleLendingProxy trustySimpleLendingProxy = new TrustySimpleLendingProxy(
@@ -75,22 +54,18 @@ contract UserProxyFactory {
             address(simpleLendingLTCR),
             address(this),
             address(userProxy),
-            address(simpleLendingCollateralManager)
+            address(simpleLendingCollateralManager),
+            address(trusty)
         );
         agentSimpleLendingContracts[msg.sender] = trustySimpleLendingProxy;
-        simpleLendingLTCR.addAuthorisedContract(address(trustySimpleLendingProxy));
+        // simpleLendingLTCR.addAuthorisedContract(address(trustySimpleLendingProxy));
         trustySimpleLendingProxy.registerAgentToLTCR();
-        userProxy.addAuthorisedContract(address(agentSimpleLendingContracts[msg.sender]));
+        // userProxy.addAuthorisedContract(address(agentSimpleLendingContracts[msg.sender]));
     }
 
     function getTrustySimpleLendingProxy()  public view returns (TrustySimpleLendingProxy) {
         require(isAgentInitialized[msg.sender], "No proxy contract exists for caller. You need to call addAgent first.");
         return agentSimpleLendingContracts[msg.sender];
-    }
-
-    function getTrustyAaveProxy()  public view returns (TrustyAaveProxy) {
-        require(isAgentInitialized[msg.sender], "No proxy contract exists for caller. You need to call addAgent first.");
-        return agentAaveContracts[msg.sender];
     }
 
     function getUserProxy(address userAddress) public view returns (address) {

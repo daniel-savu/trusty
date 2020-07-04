@@ -1,6 +1,6 @@
 var LTCR = artifacts.require("./LTCR.sol");
 var TrustyCompound = artifacts.require("./TrustyCompound.sol");
-var TrustyAaveProxy = artifacts.require("./TrustyAaveProxy.sol");
+// var TrustyAaveProxy = artifacts.require("./TrustyAaveProxy.sol");
 var UserProxy = artifacts.require("./UserProxy.sol");
 var Trusty = artifacts.require("./Trusty.sol");
 // var FlashLoanExecutor = artifacts.require("./FlashLoanExecutor.sol");

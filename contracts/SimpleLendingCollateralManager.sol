@@ -7,13 +7,15 @@ import "@studydefi/money-legos/aave/contracts/ILendingPoolAddressesProvider.sol"
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./upgradeabilityProxy/Proxy.sol";
 import "./upgradeabilityProxy/UpgradeabilityStorage.sol";
+import "@nomiclabs/buidler/console.sol";
+
 
 
 contract SimpleLendingCollateralManager is Proxy, UpgradeabilityStorage {
 // can be called by any address
 // however, Trusty addresses may receive a collateral discount
     address targetAddress;
-    Trusty trustyContract;
+    Trusty trusty;
     address constant aETHAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant LendingPoolAddressesProviderAddress = 0x24a42fD28C976A61Df5D00D0599C34c4f90748c8;
     uint256 defaultCollateralisation = 1200; // i.e. 1.2x
@@ -21,14 +23,16 @@ contract SimpleLendingCollateralManager is Proxy, UpgradeabilityStorage {
 
 
     constructor(address payable trustyAddress) public {
-        trustyContract = Trusty(trustyAddress);
+        trusty = Trusty(trustyAddress);
     }
 
     event Upgraded(uint256 version, address indexed implementation);
 
     function _upgradeTo(uint256 version, address payable implementation) public {
-        require(_implementation != implementation);
-        require(version > _version);
+        console.log(version);
+        console.log(implementation);
+        require(_implementation != implementation, "implementation must be different from existing one");
+        require(version > _version, "version must be different from existing one");
         _version = version;
         _implementation = implementation;
         emit Upgraded(version, implementation);
@@ -71,15 +75,16 @@ contract SimpleLendingCollateralManager is Proxy, UpgradeabilityStorage {
         address target,
         bytes memory abiEncoding
     ) public payable returns (bool) {
+        console.log("in makecall");
         // (address reserve, uint256 amount) = getReserveAndAmount(abiEncoding);
         // if(callNeedsCollateral(target, abiEncoding)) {
         //     require(checkReserveAmount(reserve, amount), "Funds received are not enough");
         //     uint256 totalCollateral = getTotalCollateral();
         //     uint256 loanWorth = getWorthOfLoan(reserve, amount);
 
-        //     if(trustyContract.isAddressATrustyProxy(msg.sender)) {
+        //     if(trusty.isAddressATrustyProxy(msg.sender)) {
         //         // we can apply collateral reduction
-        //         uint256 collateralisation = trustyContract.getAgentCollateral(msg.sender);
+        //         uint256 collateralisation = trusty.getAgentCollateral(msg.sender);
         //         require(totalCollateral >= loanWorth * ((defaultCollateralisation * collateralisation) / (10 ** _decimals)), "too little collateral");
         //     } else {
         //         // otherwise, just use the defaultCollateralisation

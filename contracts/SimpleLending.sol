@@ -3,6 +3,8 @@ pragma solidity ^0.5.0;
 
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@nomiclabs/buidler/console.sol";
+
 
 contract SimpleLending is Ownable {
     struct Balance {
@@ -25,6 +27,9 @@ contract SimpleLending is Ownable {
     constructor(address collateralManagerAddress, uint baseCollateralisationRateValue) public {
         collateralManager = collateralManagerAddress;
         baseCollateralisationRate = baseCollateralisationRateValue;
+        console.log("SimpleLending address:");
+        console.log(address(this));
+
     }
 
     function setBaseCollateralisationRate(uint baseCollateralisationRateValue) public onlyOwner {
@@ -38,6 +43,8 @@ contract SimpleLending is Ownable {
     function() external payable {}
 
     function deposit(address reserve, uint amount) public payable {
+        console.log(reserve);
+        console.log(amount);
         if(reserve == ethAddress) {
             require(msg.value == amount, "amount is different from msg.value");
             userBalance[msg.sender].ethBalance += amount;
@@ -58,13 +65,13 @@ contract SimpleLending is Ownable {
         }
     }
 
-    function getAccountBalance(address account) public returns (uint, uint) {
+    function getAccountBalance(address account) public view returns (uint, uint) {
         uint deposits = userBalance[account].ethBalance + (userBalance[account].daiBalance / getEthToDaiPrice());
         uint borrows = userBorrow[account].ethBorrow + (userBorrow[account].daiBorrow / getEthToDaiPrice());
         return (deposits, borrows);
     }
 
-    function getEthToDaiPrice() public returns (uint) {
+    function getEthToDaiPrice() public view returns (uint) {
         uint random_number = uint(blockhash(block.number - 1)) % 100 + 1;
         uint sign = uint256(keccak256(abi.encodePacked(block.timestamp))) % 2;
         if(sign == 0) {
