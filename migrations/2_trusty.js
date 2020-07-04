@@ -1,5 +1,5 @@
 var LTCR = artifacts.require("./LTCR.sol");
-var TrustyCompound = artifacts.require("./TrustyCompound.sol");
+// var TrustyCompound = artifacts.require("./TrustyCompound.sol");
 // var TrustyAaveProxy = artifacts.require("./TrustyAaveProxy.sol");
 var UserProxy = artifacts.require("./UserProxy.sol");
 var Trusty = artifacts.require("./Trusty.sol");
@@ -12,7 +12,7 @@ var LendingPoolAddressesProviderABI = require("../test/ABIs/LendingPoolAddresses
 
 module.exports = function (deployer) {
     deployer.deploy(LTCR);
-    deployer.deploy(TrustyCompound);
+    // deployer.deploy(TrustyCompound);
     // deployer.deploy(TrustyAaveProxy);
     // deployer.deploy(UserProxy);
     deployer.deploy(Trusty);

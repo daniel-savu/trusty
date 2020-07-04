@@ -167,8 +167,8 @@ contract UserProxy is Ownable {
                 IERC20(reserve).approve(target, amount);
                 (success, ) = target.call(abiEncoding);
             } else {
-                console.log("calling with value");
-                console.log(amount);
+                // console.log("calling with value");
+                // console.log(amount);
                 (success, ) = target.call.value(amount)(abiEncoding);
             }
         } else {

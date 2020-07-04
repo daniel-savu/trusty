@@ -97,17 +97,13 @@ contract("SimpleLending Protocol", accounts => {
         this.timeout(1000000);
         let accs = await web3.eth.getAccounts();
         const t = await Trusty.new();
-        console.log(`typeof t: ${typeof t}`);
-        console.log("deploying trusty");
         const userProxyFactoryAddress = await t.getUserProxyFactoryAddress();
         const simpleLendingAddress = await t.getSimpleLendingAddress();
         const simpleLending = await SimpleLending.at(simpleLendingAddress);
-        console.log("deployed trusty");
         // initializeSimpleLendingLTCR(t);
         const userProxyFactory = await UserProxyFactory.at(userProxyFactoryAddress);
         let addAgentTx = await userProxyFactory.addAgent();
 
-        console.log("added agent");
         const trustySimpleLendingProxyAddress = await userProxyFactory.getTrustySimpleLendingProxy();
         const trustySimpleLendingProxy = await TrustySimpleLendingProxy.at(trustySimpleLendingProxyAddress);
 
@@ -125,21 +121,47 @@ contract("SimpleLending Protocol", accounts => {
 
         console.log("Deposited funds in UserProxy");
         let balanceAfterDeposit = await web3.eth.getBalance(up.address)
-        console.log(`Balance:                                                    ${balanceAfterDeposit}`)
+        console.log(`Balance:                 ${balanceAfterDeposit}`)
 
         tr = await trustySimpleLendingProxy.deposit(
             ethAddress,
             ethAmountInWei
         );
 
-        console.log(tr);
         console.log("Deposited 1 Ether")
 
-        // let balanceAfterAaveDeposit = await web3.eth.getBalance(up.address)
-        // console.log(`Balance left:                                         ${balanceAfterAaveDeposit}`)
+        let balanceAfterSLDeposit = await web3.eth.getBalance(up.address)
+        console.log(`Balance left:            ${balanceAfterSLDeposit}`)
 
-        // let userSimpleLendingBalance = await simpleLending.getAccountBalance(up.address);
+        let balanceInSLProxy = await web3.eth.getBalance(simpleLendingAddress)
+        console.log(`Balance in SLProxy:      ${balanceInSLProxy}`)
+        
+        // console.log(tr);
+
+        // let balanceInSL = await web3.eth.getBalance("0x45070c0860d5d74e0294b6cb9bcc73cddfbef7c0")
+        // console.log(`Balance in SL:           ${balanceInSL}`)
+
+
+        // const simpleLendingAddressReal = await t.getSimpleLendingRealAddress();
+        // const trustySimpleLendingProxyReal = await TrustySimpleLendingProxy.at(simpleLendingAddressReal);
+
+        // tr = await trustySimpleLendingProxyReal.deposit(
+        //     ethAddress,
+        //     ethAmountInWei,
+        //     {
+        //         gasLimit: web3.utils.toHex(1500000),
+        //         gasPrice: web3.utils.toHex(20000000000),
+        //         value: web3.utils.toHex(web3.utils.toWei('1', 'ether'))
+        //     }
+        // );
+        
+
+        // let userSimpleLendingBalance = await simpleLending.getAccountDeposits(up.address);
         // console.log(`Balance in the SimpleLending contract: ${userSimpleLendingBalance}`)
+
+        // let userSimpleLendingBorrows = await simpleLending.getAccountBorrows(up.address);
+        // console.log(`Borrows in the SimpleLending contract: ${userSimpleLendingBorrows}`)
+        
     });
 
 });

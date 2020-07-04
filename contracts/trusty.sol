@@ -43,6 +43,8 @@ contract Trusty {
         // temporary deployment simpleLending related contracts
         simpleLending = new SimpleLending(address(simpleLendingCollateralManager), baseCollateralisationRateValue);
         simpleLendingProxy = new SimpleLendingProxy();
+        console.log("simpleLendingProxy address:");
+        console.log(address(simpleLendingProxy));
         simpleLendingProxy._upgradeTo(1, address(uint160(address(simpleLending))));
     }
 
@@ -122,6 +124,10 @@ contract Trusty {
 
     function getSimpleLendingAddress() public view returns (address) {
         return address(simpleLendingProxy);
+    }
+
+    function getSimpleLendingRealAddress() public view returns (address) {
+        return address(simpleLending);
     }
 
     function getSimpleLendingLTCR() public view returns (address) {

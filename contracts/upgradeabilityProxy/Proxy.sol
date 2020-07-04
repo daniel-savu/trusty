@@ -22,22 +22,24 @@ contract Proxy {
   * This function will return whatever the implementation call returns
   */
     function () payable external {
-        console.log("in proxy fallback:");
-        console.log(address(this));
         address payable _impl = implementation();
+        console.log("in proxy fallback:");
+        
         require(_impl != address(0));
-        console.log("implementation:");
+
+        // address payable _innerImpl;
+        // bytes4 sig;
+        // address thisAddress = address(this);
+        // bytes memory implementationFunctionEncoding = abi.encodeWithSignature("implementation()");
+        // (bool success, ) = _impl.call(implementationFunctionEncoding);
+        // if (success) {
+        //     _innerImpl = Proxy(_impl).implementation();
+        //     this.setImplementation(_innerImpl);
+        //     sig = bytes4(keccak256("setImplementation(address)"));
+        // }
+
         console.log(_impl);
-        address payable _innerImpl;
-        bytes4 sig;
-        address thisAddress = address(this);
-        bytes memory implementationFunctionEncoding = abi.encodeWithSignature("implementation()");
-        (bool success, ) = _impl.call(implementationFunctionEncoding);
-        if (success) {
-            _innerImpl = Proxy(_impl).implementation();
-            this.setImplementation(_innerImpl);
-            sig = bytes4(keccak256("setImplementation(address)"));
-        }
+        console.logBytes(msg.data);
 
         assembly {
             /*
@@ -57,7 +59,7 @@ contract Proxy {
                 Third argument, calldatasize, specifies how much data will be copied.
                     calldata is naturally calldatasize bytes long (same thing as msg.data.length)
             */
-            calldatacopy(ptr, 0, calldatasize)
+            calldatacopy(0, 0, calldatasize)
             /*
                 delegatecall params explained:
                 gas: the amount of gas to provide for the call. `gas` is an Opcode that gives
@@ -75,7 +77,7 @@ contract Proxy {
 
                 result: This will be 0 if the call fails and 1 if it succeeds
             */
-            let result := delegatecall(gas, _impl, ptr, calldatasize, 0, 0)
+            let result := delegatecall(gas, _impl, 0, calldatasize, 0, 0)
             /*
 
             */
@@ -89,34 +91,34 @@ contract Proxy {
                 we get a memory location beyond the end of the data we will be copying to ptr.
                 We place this in at 0x40, and any reads from 0x40 will now read from free memory
             */
-            mstore(0x40, add(ptr, returndatasize))
-            /*
-                `returndatacopy` is an Opcode that copies the last return data to a slot. `ptr` is the
-                    slot it will copy to, 0 means copy from the beginning of the return data, and size is
-                    the amount of data to copy.
-                `returndatasize` is an Opcode that gives us the size of the last return data. In this case, that is the size of the data returned from delegatecall
-            */
-            returndatacopy(ptr, 0, returndatasize)
+            // mstore(0x40, add(ptr, returndatasize))
+            // /*
+            //     `returndatacopy` is an Opcode that copies the last return data to a slot. `ptr` is the
+            //         slot it will copy to, 0 means copy from the beginning of the return data, and size is
+            //         the amount of data to copy.
+            //     `returndatasize` is an Opcode that gives us the size of the last return data. In this case, that is the size of the data returned from delegatecall
+            // */
+            // returndatacopy(ptr, 0, returndatasize)
 
-            let retdatasize := returndatasize
+            // let retdatasize := returndatasize
 
-            switch sig
-            case 0 {}
-            default {
-                let x := mload(0x40)
-                mstore(x, sig)
-                mstore(add(x, 0x04), _impl)
-                let success := call(gas, thisAddress, 0, x, 0x24, x, 0x0)
-            }
+            // switch sig
+            // case 0 {}
+            // default {
+            //     let x := mload(0x40)
+            //     mstore(x, sig)
+            //     mstore(add(x, 0x04), _impl)
+            //     let success := call(gas, thisAddress, 0, x, 0x24, x, 0x0)
+            // }
 
-            /*
-                if `result` is 0, revert.
-                if `result` is 1, return `size` amount of data from `ptr`. This is the data that was
-                copied to `ptr` from the delegatecall return data
-            */
-            switch result
-            case 0 { revert(ptr, retdatasize) }
-            default { return(ptr, retdatasize) }
+            // /*
+            //     if `result` is 0, revert.
+            //     if `result` is 1, return `size` amount of data from `ptr`. This is the data that was
+            //     copied to `ptr` from the delegatecall return data
+            // */
+            // switch result
+            // case 0 { revert(ptr, retdatasize) }
+            // default { return(ptr, retdatasize) }
         }
     }
 }

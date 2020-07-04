@@ -55,7 +55,6 @@ contract TrustyAaveProxy is Ownable {
 
     function registerAgentToLTCR() public onlyOwner {
         ltcr.registerAgent(agentOwner, 100);
-        console.log("registered agent");
     }
 
     function curate() public {
@@ -89,7 +88,7 @@ contract TrustyAaveProxy is Ownable {
     // LendingPool contract
 
     function getLendingPoolAddress() private view returns (address) {
-        return ILendingPoolAddressesProvider(LendingPoolAddressesProviderAddress).getLendingPool();
+        return ILendingPoolAddressesProvider(LendingPoolAddressesProviderAddress).getAddress("LENDING_POOL");
     }
 
     function deposit(address reserve, uint256 amount, uint16 referralCode) public {

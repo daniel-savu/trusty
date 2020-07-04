@@ -29,7 +29,6 @@ contract SimpleLending is Ownable {
         baseCollateralisationRate = baseCollateralisationRateValue;
         console.log("SimpleLending address:");
         console.log(address(this));
-
     }
 
     function setBaseCollateralisationRate(uint baseCollateralisationRateValue) public onlyOwner {
@@ -40,13 +39,20 @@ contract SimpleLending is Ownable {
         return baseCollateralisationRate;
     }
 
-    function() external payable {}
+    function() external payable {
+        console.log("in SimpleLending fallback");
+        console.logBytes(msg.data);
+    }
 
-    function deposit(address reserve, uint amount) public payable {
+    function deposit(address reserve, uint256 amount) public payable {
+        console.log("in SimpleLending deposit");
         console.log(reserve);
         console.log(amount);
+        console.logBytes(msg.data);
         if(reserve == ethAddress) {
             require(msg.value == amount, "amount is different from msg.value");
+            console.log("adding balance to:");
+            console.log(msg.sender);
             userBalance[msg.sender].ethBalance += amount;
         } else {
             IERC20(reserve).transferFrom(msg.sender, address(this), amount);
@@ -54,7 +60,8 @@ contract SimpleLending is Ownable {
         }
     }
 
-    function borrow(address reserve, uint amount) public {
+    function borrow(address reserve, uint256 amount) public {
+        console.log("in SimpleLending borrow");
         require(address(this) == collateralManager, "You must use the Collateral Manager contract as a proxy to call this contract");
         if(reserve == ethAddress) {
             msg.sender.transfer(amount);
@@ -65,10 +72,14 @@ contract SimpleLending is Ownable {
         }
     }
 
-    function getAccountBalance(address account) public view returns (uint, uint) {
+    function getAccountDeposits(address account) public view returns (uint) {
         uint deposits = userBalance[account].ethBalance + (userBalance[account].daiBalance / getEthToDaiPrice());
+        return deposits;
+    }
+
+    function getAccountBorrows(address account) public view returns (uint) {
         uint borrows = userBorrow[account].ethBorrow + (userBorrow[account].daiBorrow / getEthToDaiPrice());
-        return (deposits, borrows);
+        return borrows;
     }
 
     function getEthToDaiPrice() public view returns (uint) {

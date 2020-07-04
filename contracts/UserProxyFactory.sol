@@ -31,7 +31,6 @@ contract UserProxyFactory {
     function() external payable {}
 
     function addAgent() public {
-        console.log("in addAgent");
         if (!isAgentInitialized[msg.sender]) {
             UserProxy userProxy = new UserProxy(msg.sender, address(trusty));
             userAddressToUserProxy[msg.sender] = userProxy;
