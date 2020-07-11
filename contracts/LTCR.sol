@@ -7,7 +7,6 @@ import "@nomiclabs/buidler/console.sol";
 contract LTCR is Ownable {
     address[] authorisedContracts;
 
-    uint256 _minCollateral; // minimum collateral
     uint256 _decimals; // decimals to calculate collateral factor
 
     // Implementation of L = (lower, upper, factor)
@@ -18,7 +17,6 @@ contract LTCR is Ownable {
 
     // Implementation of the relevant agreement parameters A = (phi, payment, score, deposits)
     mapping (uint256 => uint256) _rewards; // reward (score) for performing an action
-    mapping (address => uint256) _deposits; // amount of deposit
 
     // Implementation of the registry
     mapping (uint256 => mapping (address => uint)) _assignments; // layer assignment by round and agent
@@ -74,18 +72,10 @@ contract LTCR is Ownable {
         return true;
     }
 
-    // ##################
-    // ### Collateral ###
-    // ##################
-
-    function setCollateral(uint256 mincollateral) public {
-        _minCollateral = mincollateral;
-    }
-
     // ##############
     // ### FACTOR ###
     // ##############
-    function getAgentFactor(address agent) public view returns (uint256) {      
+    function getAgentFactor(address agent) public view returns (uint256) {   
         uint assignment = getAssignment(agent);
 
         require(assignment > 0, "agent not assigned to layer");
@@ -160,14 +150,6 @@ contract LTCR is Ownable {
         }
     }
 
-    function getAgentCollateral(address agent) public view returns (uint256) {
-        uint assignment = getAssignment(agent);
-
-        require(assignment > 0, "agent not assigned to layer");
-
-        return _deposits[agent];
-    }
-
     function getScore(address agent) public view returns (uint256) {
         uint assignment = getAssignment(agent);
 
@@ -176,24 +158,22 @@ contract LTCR is Ownable {
         return _scores[_round][agent];
     }
 
-    function registerAgent(address agent, uint256 collateral) public returns (bool) {
-        require(collateral >= _minCollateral * (_factors[_layers[0]] / (10 ** _decimals)), "too little collateral");
-        
+    function registerAgent(address agent) public returns (bool) {
+        console.log("LTCR registering:");
+        console.log(agent);
         // register agent
         _agents[agent] = true;
         // asign agent to lowest layer
         _assignments[_round][agent] = _layers[0];
-        // track the deposit
-        _deposits[agent] = collateral;
         // update the score of the agent
         _scores[_round][agent] += _rewards[0];
         
-        emit RegisterAgent(agent, collateral);
+        emit RegisterAgent(agent);
         
         return true;
     }
 
-    event RegisterAgent(address agent, uint256 collateral);
+    event RegisterAgent(address agent);
 
     // ####################
     // ### TCR CONTROLS ###

@@ -4,35 +4,26 @@ pragma solidity ^0.5.0;
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@nomiclabs/buidler/console.sol";
-import "./TrustyValidator.sol";
+import "../Trusty.sol";
 
 
 
 contract SimpleLending is Ownable {
-    struct Balance {
-        uint eth;
-        uint dai;
-    }
-
-    struct Borrow {
-        uint eth;
-        uint dai;
-    }
-
-    mapping (address => Balance) userBalance;
-    mapping (address => Borrow) userBorrow;
-    address ethAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    address daiAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    uint ethLiquidity = 0;
-    uint daiLiquidity = 0;
-    address collateralManager;
+    mapping (address => mapping(address => uint)) userDeposits;
+    mapping (address => mapping(address => uint)) userLoans;
+    mapping(address => uint) reserveLiquidity;
+    address[] reserves;
     uint baseCollateralisationRate;
-    TrustyValidator trustyValidator;
+    Trusty trusty;
+    address ethAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    uint256 collateralizationDecimals = 3; // decimals to calculate collateral factor
 
-    constructor(address collateralManagerAddress, uint baseCollateralisationRateValue) public {
-        collateralManager = collateralManagerAddress;
+    uint conversionDecimals = 25;
+
+    constructor(address payable trustyAddress, uint baseCollateralisationRateValue) public {
         baseCollateralisationRate = baseCollateralisationRateValue;
-        trustyValidator = new TrustyValidator(collateralManagerAddress, baseCollateralisationRate);
+        trusty = Trusty(trustyAddress);
+        reserves.push(ethAddress);
         console.log("SimpleLending address:");
         console.log(address(this));
     }
@@ -49,142 +40,140 @@ contract SimpleLending is Ownable {
         return baseCollateralisationRate;
     }
 
+    function addReserve(address newReserve) public {
+        reserves.push(newReserve);
+    }
+
     function deposit(address reserve, uint256 amount) public payable {
         console.log("in SimpleLending deposit");
         if(reserve == ethAddress) {
             require(msg.value == amount, "amount is different from msg.value");
-            console.log("adding balance to:");
-            console.log(msg.sender);
-            userBalance[msg.sender].eth += amount;
-            ethLiquidity += amount;
         } else {
             IERC20(reserve).transferFrom(msg.sender, address(this), amount);
-            userBalance[msg.sender].dai += amount;
-            daiLiquidity += amount;
         }
+        userDeposits[msg.sender][reserve] += amount;
+        reserveLiquidity[reserve] += amount;
+        console.log("received deposit");
+        console.log(userDeposits[msg.sender][reserve]);
     }
 
-    function borrow(address reserve, uint256 amount) public hasEnoughCollateral(reserve, amount) enoughLiquidity(reserve, amount) {
+    function borrow(address reserve, uint256 amount) public hasEnoughCollateral(reserve, amount) {
         console.log("in SimpleLending borrow");
-        if(reserve == ethAddress) {
-            msg.sender.transfer(amount);
-            userBorrow[msg.sender].eth += amount;
-            ethLiquidity -= amount;
-        } else {
-            IERC20(reserve).transfer(msg.sender, amount);
-            userBorrow[msg.sender].dai += amount;
-            daiLiquidity -= amount;
-        }
+        require(reserveLiquidity[reserve] >= amount, "not enough reserve liquidity");
+        makePayment(reserve, amount, msg.sender);
+        userLoans[msg.sender][reserve] += amount;
     }
 
     function repay(address reserve, uint256 amount, address onBehalf) public payable {
+        require(userLoans[onBehalf][reserve] >= amount, "amount is larger than actual borrow");
         if(reserve == ethAddress) {
             require(msg.value == amount, "amount is different from msg.value");
-            require(userBorrow[onBehalf].eth >= amount, "amount is larger than actual borrow");
-            userBorrow[onBehalf].eth -= amount;
-            ethLiquidity += amount;
         } else {
             IERC20(reserve).transferFrom(msg.sender, address(this), amount);
-            userBorrow[onBehalf].dai -= amount;
-            daiLiquidity += amount;
         }
+        userLoans[msg.sender][reserve] -= amount;
+        reserveLiquidity[reserve] += amount;
     }
 
-    function liquidate(address account, address reserve, uint256 amount) public {
+    function liquidate(address borrower, address collateralReserve, address loanReserve, uint256 loanAmount) public payable {
         // need to retrieve the collateralization ratio of 'account'
         // from the Trusty contract
         // and check whether user is undercollateralized
-        uint deposits = getAccountDeposits(msg.sender);
-        uint borrows = getAccountBorrows(msg.sender);
-        uint callCollateralization = trustyValidator.getCollateralizationRatio(msg.sender, msg.data);
-        uint availableCollateral = deposits - borrows * callCollateralization;
-        
+        uint deposits = getAccountDeposits(borrower);
+        uint borrows = getAccountBorrows(borrower);
+        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAgentCollateralizationRatio(borrower);
+        uint availableCollateral = deposits - borrows * accountCollateralizationRatio;
 
-
+        require(availableCollateral < 0, "The account is already properly collateralized");
+        require(userLoans[borrower][loanReserve] >= loanAmount, "amount is larger than actual loan");
+        if(loanReserve == ethAddress) {
+            require(msg.value == loanAmount, "amount is different from msg.value");
+        } else {
+            IERC20(loanReserve).transferFrom(msg.sender, address(this), loanAmount);
+        }
+        userLoans[borrower][loanReserve] -= loanAmount;
+        uint returnedCollateralAmount = convert(loanReserve, collateralReserve, loanAmount);
+        userDeposits[borrower][collateralReserve] -= returnedCollateralAmount;
+        makePayment(collateralReserve, loanAmount, msg.sender);
+        reserveLiquidity[loanReserve] += loanAmount;
+        reserveLiquidity[collateralReserve] -= returnedCollateralAmount;
     }
 
     function redeem(address reserve, uint256 amount) public hasEnoughCollateral(reserve, amount) {
         // if hasEnoughCollateral fails, it means that the user will have too little collateral left
         // after redeeming
-        if(reserve == ethAddress) {
-            uint userLiquidity = userBalance[msg.sender].eth - userBorrow[msg.sender].eth;
-            require(userLiquidity > 0, "You don't have enough liquidity in this reserve");
-            userBalance[msg.sender].eth -= amount;
-        } else {
-            uint userLiquidity = userBalance[msg.sender].dai - userBorrow[msg.sender].dai;
-            require(userLiquidity > 0, "You don't have enough liquidity in this reserve");
-            userBalance[msg.sender].dai -= amount;
-        }
+        uint userLiquidity = userDeposits[msg.sender][reserve] - userLoans[msg.sender][reserve];
+        require(userLiquidity > 0, "You don't have enough liquidity in this reserve");
         makePayment(reserve, amount, msg.sender);
+        userDeposits[msg.sender][reserve] -= amount;
     }
 
-    function makePayment(address reserve, uint256 amount, address payee) internal enoughLiquidity(reserve, amount) {
+    function makePayment(address reserve, uint256 amount, address payable payee) internal enoughLiquidity(reserve, amount) {
         if(reserve == ethAddress) {
             payee.transfer(amount);
         } else {
             IERC20(reserve).transfer(payee, amount);
         }
+        reserveLiquidity[reserve] -= amount;
     }
 
     modifier hasEnoughCollateral(address reserve, uint256 amount) {
-        uint deposits = getAccountDeposits(msg.sender);
-        uint borrows = getAccountBorrows(msg.sender);
-        uint callCollateralization = trustyValidator.getCollateralizationRatio(msg.sender, msg.data);
-        uint availableCollateral = deposits - borrows * callCollateralization;
-
-        uint loanWorth;
+        uint borrowableAmountInETH = getBorrowableAmountInETH(msg.sender);
+        uint loanWorthInETH;
         if(reserve == ethAddress) {
-            loanWorth = amount;
+            loanWorthInETH = amount;
         } else {
-            loanWorth = amount * getEthToDaiPrice();
+            loanWorthInETH = convert(ethAddress, reserve, amount);
         }
-        require(availableCollateral >= loanWorth * (callCollateralization / (10 ** _decimals)), "too little collateral");
+        console.log("loanWorthInETH:");
+        console.log(loanWorthInETH);
+        require(borrowableAmountInETH >= loanWorthInETH, "too little collateral");
         _;
     }
 
     modifier enoughLiquidity(address reserve, uint256 amount) {
-        if(reserve == ethAddress) {
-            require(ethLiquidity >= amount, "not enough ETH liquidity");
-        } else {
-            require(ethLiquidity >= amount, "not enough DAI liquidity");
-        }
+        require(reserveLiquidity[reserve] >= amount, "not enough reserve liquidity");
         _;
     }
 
     function getAccountDeposits(address account) public view returns (uint) {
-        uint deposits = userBalance[account].eth + (userBalance[account].dai * getDaiToEthPrice());
+        uint deposits = 0;
+        for(uint i = 0; i < reserves.length; i++) {
+            deposits += convert(reserves[i], ethAddress, userDeposits[account][reserves[i]]);
+        }
         return deposits;
     }
 
     function getAccountBorrows(address account) public view returns (uint) {
-        uint borrows = userBorrow[account].eth + (userBorrow[account].dai * getDaiToEthPrice());
+        uint borrows = 0;
+        for(uint i = 0; i < reserves.length; i++) {
+            borrows += convert(reserves[i], ethAddress, userLoans[account][reserves[i]]);
+        }
         return borrows;
     }
 
-    function getEthToDaiRandomPrice() public view returns (uint) {
-        uint random_number = uint(blockhash(block.number - 1)) % 100 + 1;
-        uint sign = uint256(keccak256(abi.encodePacked(block.timestamp))) % 2;
-        if(sign == 0) {
-            return 229 - random_number;
-        } else {
-            return 229 + random_number;
-        }
+    function getBorrowableAmountInETH(address account) public returns (uint) {
+        uint deposits = getAccountDeposits(account);
+        uint borrows = getAccountBorrows(account);
+        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAgentCollateralizationRatio(account);
+        uint borrowableAmountInETH = ((deposits * (10 ** collateralizationDecimals)) / accountCollateralizationRatio) - borrows;
+        console.log("borrowableAmountInETH:");
+        console.log(borrowableAmountInETH);
+        return borrowableAmountInETH;
     }
 
-    function getEthToDaiPrice() public view returns (uint) {
-        if (ethLiquidity == 0) {
+    function conversionRate(address fromReserve, address toReserve) public view returns (uint) {
+        if (reserveLiquidity[fromReserve] == 0 || reserveLiquidity[toReserve] == 0) {
             // if there's no liquidity, the price is "infinity"
-            return type(uint256).max;
+            return  2**100;
         }
-        return daiLiquidity / ethLiquidity;
+        uint from = reserveLiquidity[fromReserve];
+        uint to = reserveLiquidity[toReserve];
+        return from * (10 ** conversionDecimals) / to;
     }
 
-    function getDaiToEthPrice() public view returns (uint) {
-        if (daiLiquidity == 0) {
-            // if there's no liquidity, the price is "infinity"
-            return type(uint256).max;
-        }
-        return ethLiquidity / daiLiquidity;
+    function convert(address fromReserve, address toReserve, uint amount) public view returns (uint) {
+        return (amount * conversionRate(toReserve, fromReserve)) / (10 ** conversionDecimals);
     }
 
 }

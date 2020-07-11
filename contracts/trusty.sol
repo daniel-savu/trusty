@@ -4,9 +4,7 @@ pragma solidity ^0.5.0;
 import "@nomiclabs/buidler/console.sol";
 import "./LTCR.sol";
 import "./UserProxy.sol";
-import "./SimpleLending.sol";
-import "./SimpleLendingProxy.sol";
-import "./SimpleLendingCollateralManager.sol";
+import "./SimpleLending/SimpleLending.sol";
 import "./TrustySimpleLendingProxy.sol";
 import "./UserProxyFactory.sol";
 // import "node_modules/@studydefi/money-legos/compound/contracts/ICEther.sol";
@@ -17,9 +15,8 @@ contract Trusty {
     LTCR simpleLendingLTCR;
 
     SimpleLending simpleLending;
-    SimpleLendingProxy simpleLendingProxy;
-    SimpleLendingCollateralManager simpleLendingCollateralManager;
     UserProxyFactory userProxyFactory;
+    TrustySimpleLendingProxy trustySimpleLendingProxy;
 
     uint8[] simpleLendingLayers;
     uint256[] simpleLendingLayerFactors;
@@ -29,23 +26,15 @@ contract Trusty {
     constructor() public {
         simpleLendingLTCR = new LTCR();
         initializeSimpleLendingLTCR();
-        simpleLendingCollateralManager = new SimpleLendingCollateralManager(address(this));
-        uint baseCollateralisationRateValue = 1200;
-
+        uint baseCollateralisationRateValue = 1500;
+        simpleLendingLTCR.addAuthorisedContract(address(userProxyFactory));
+        // temporary deployment simpleLending related contracts
+        simpleLending = new SimpleLending(address(this), baseCollateralisationRateValue);
         userProxyFactory = new UserProxyFactory(
-            address(simpleLendingCollateralManager),
             address(simpleLendingLTCR),
             address(this)
         );
-
-        simpleLendingLTCR.addAuthorisedContract(address(userProxyFactory));
-
-        // temporary deployment simpleLending related contracts
-        simpleLending = new SimpleLending(address(simpleLendingCollateralManager), baseCollateralisationRateValue);
-        simpleLendingProxy = new SimpleLendingProxy();
-        console.log("simpleLendingProxy address:");
-        console.log(address(simpleLendingProxy));
-        simpleLendingProxy._upgradeTo(1, address(uint160(address(simpleLending))));
+        initializeSimpleLendingProxy();
     }
 
     function initializeSimpleLendingLTCR() private {
@@ -56,8 +45,6 @@ contract Trusty {
         uint flashLoanAction;
         uint redeemAction;
 
-        simpleLendingLTCR.setCollateral(1);
-        
         // Below are some mock layer factors for demonstration purposes.
         // Proper factors need to be chosen following a game theoretical analysis,
         // like in the section 7 of the Balance paper: https://dl.acm.org/doi/pdf/10.1145/3319535.3354221
@@ -70,11 +57,11 @@ contract Trusty {
 
         // the Layer Token Curated Registry contract (LTCR) uses 3 decimals
         // the LTCR is based on Balance: https://github.com/nud3l/balance
-        simpleLendingLayerFactors.push(2000);
-        simpleLendingLayerFactors.push(1800);
-        simpleLendingLayerFactors.push(1500); // 153% is the highest collateral ratio in Aave
-        simpleLendingLayerFactors.push(1250);
-        simpleLendingLayerFactors.push(1100);
+        simpleLendingLayerFactors.push(1000); // 100% of the collateral must be paid
+        simpleLendingLayerFactors.push(900);
+        simpleLendingLayerFactors.push(850); // 85% of the collateral must be paid
+        simpleLendingLayerFactors.push(800);
+        simpleLendingLayerFactors.push(750);
 
         simpleLendingLayerLowerBounds.push(0);
         simpleLendingLayerLowerBounds.push(20);
@@ -110,7 +97,7 @@ contract Trusty {
         flashLoanAction = 5;
         redeemAction = 6;
         
-        simpleLendingLTCR.setReward(depositAction, 15);
+        simpleLendingLTCR.setReward(depositAction, 15); // user can be promoted to next layer with two deposits
         simpleLendingLTCR.setReward(borrowAction, 0);
         simpleLendingLTCR.setReward(repayAction, 5);
         simpleLendingLTCR.setReward(liquidationCallAction, 10);
@@ -122,10 +109,6 @@ contract Trusty {
         return address(userProxyFactory);
     }
 
-    function getSimpleLendingAddress() public view returns (address) {
-        return address(simpleLendingProxy);
-    }
-
     function getSimpleLendingRealAddress() public view returns (address) {
         return address(simpleLending);
     }
@@ -134,9 +117,17 @@ contract Trusty {
         return address(simpleLendingLTCR);
     }
 
-    function getAgentCollateral(address agent) public pure returns (uint256) {
+    function getSimpleLendingAddress() public view returns (address) {
+        return address(simpleLending);
+    }
+
+    function getAgentCollateralizationRatio(address agent) public returns (uint256) {
         // a factor of 1500 is equal to 1.5 times the collateral
-        return 1000;
+        return aggregateLTCRs(agent);
+    }
+
+    function aggregateLTCRs(address agent) public returns (uint) {
+        return simpleLendingLTCR.getAgentFactor(agent);
     }
 
     function moveFundsToUserProxy(address agentOwner, address _reserve, uint _amount) public {
@@ -146,6 +137,27 @@ contract Trusty {
         } else {
             msg.sender.transfer(_amount);
         }
+    }
+
+    function initializeSimpleLendingProxy() private {
+        console.log("in initializeSimpleLendingProxy");
+        console.log(address(userProxyFactory));
+        console.log(address(simpleLendingLTCR));
+        trustySimpleLendingProxy = new TrustySimpleLendingProxy(
+            address(simpleLendingLTCR),
+            address(this),
+            address(userProxyFactory)
+        );
+        // simpleLendingLTCR.addAuthorisedContract(address(trustySimpleLendingProxy));
+        // userProxy.addAuthorisedContract(address(agentSimpleLendingContracts[msg.sender]));
+    }
+
+    function setTrustySimpleLendingProxy(address payable trustySimpleLendingProxyAddress) public {
+        trustySimpleLendingProxy = TrustySimpleLendingProxy(trustySimpleLendingProxyAddress);
+    }
+
+    function getTrustySimpleLendingProxy()  public view returns (address) {
+        return address(trustySimpleLendingProxy);
     }
 
     function() external payable {

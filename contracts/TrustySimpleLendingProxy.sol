@@ -6,20 +6,17 @@ import "./LTCR.sol";
 import "@nomiclabs/buidler/console.sol";
 import "./Trusty.sol";
 import "./UserProxy.sol";
-import "./SimpleLendingCollateralManager.sol";
 import "./UserProxyFactory.sol";
+import "./SimpleLending/SimpleLending.sol";
 
 // import "./InitializableAdminUpgradeabilityProxy.sol";
 
 contract TrustySimpleLendingProxy is Ownable {
-    address agentOwner;
     address constant LendingPoolAddressesProviderAddress = 0x24a42fD28C976A61Df5D00D0599C34c4f90748c8;
     address constant aETHAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant aETHContractAddress = 0x3a3A65aAb0dd2A17E3F1947bA16138cd37d08c04;
     address constant daiAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     LTCR ltcr;
-    SimpleLendingCollateralManager simpleLendingCollateralManager;
-    UserProxyFactory userProxyFactory;
 
     uint256 depositAction;
     uint256 borrowAction;
@@ -28,22 +25,16 @@ contract TrustySimpleLendingProxy is Ownable {
     uint256 flashLoanAction;
     uint256 redeemAction;
     Trusty trusty;
-    UserProxy userProxy;
+    UserProxyFactory userProxyFactory;
 
     constructor(
-        address agent,
         address ltcrAddress,
-        address payable userProxyFactoryAddress,
-        address payable userProxyAddress,
-        address payable simpleLendingCollateralManagerAddress,
-        address payable trustyAddress
+        address payable trustyAddress,
+        address payable UserProxyFactoryAddress
     ) public {
-        agentOwner = agent;
-        userProxyFactory = UserProxyFactory(userProxyFactoryAddress);
-        userProxy = UserProxy(userProxyAddress);
         ltcr = LTCR(ltcrAddress);
         trusty = Trusty(trustyAddress);
-        simpleLendingCollateralManager = SimpleLendingCollateralManager(simpleLendingCollateralManagerAddress);
+        userProxyFactory = UserProxyFactory(UserProxyFactoryAddress);
         depositAction = 1;
         borrowAction = 2;
         repayAction = 3;
@@ -54,21 +45,16 @@ contract TrustySimpleLendingProxy is Ownable {
 
     function() external payable {}
 
-    function registerAgentToLTCR() public {
-        // console.log(agentOwner);
-        ltcr.registerAgent(agentOwner, 100);
-    }
-
     function curate() public {
         ltcr.curate();
     }
 
-    function getAgentFactor() public view returns (uint256) {
-        return ltcr.getAgentFactor(agentOwner);
+    function getAgentFactor(address agent) public view returns (uint256) {
+        return ltcr.getAgentFactor(agent);
     }
 
-    function getAgentScore() public view returns (uint256) {
-        return ltcr.getScore(agentOwner);
+    function getAgentScore(address agent) public view returns (uint256) {
+        return ltcr.getScore(agent);
     }
 
 
@@ -78,44 +64,29 @@ contract TrustySimpleLendingProxy is Ownable {
 
     function deposit(address reserve, uint256 amount) public {
         console.log("in trustySLProxy");
-        console.logBytes(msg.data);
-        console.log(reserve);
-        console.log(amount);
-        address SimpleLendingAddress = trusty.getSimpleLendingAddress();
+        address simpleLendingAddress = trusty.getSimpleLendingAddress();
         bytes memory abiEncoding = abi.encodeWithSignature(
             "deposit(address,uint256)",
             reserve,
             amount
         );
-        // bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
-        //     "makeCall(address,bytes)",
-        //     SimpleLendingAddress,
-        //     abiEncoding
-        // );
-        // simpleLendingCollateralManager._upgradeTo(1, address(uint160(address(SimpleLendingAddress))));
-        simpleLendingCollateralManager._upgradeTo(2, address(uint160(address(SimpleLendingAddress))));
-        console.log("upgraded simpleLendingCollateralManager address");
-        bool success = userProxy.proxyCall(address(simpleLendingCollateralManager), abiEncoding, reserve, amount);
+        UserProxy userProxy = UserProxy(userProxyFactory.getUserProxyAddress(msg.sender));
+        bool success = userProxy.proxyCall(simpleLendingAddress, abiEncoding, reserve, amount);
         require(success, "deposit failed");
-        // ltcr.update(agentOwner, depositAction);
+        ltcr.update(address(userProxy), depositAction);
     }
 
     function borrow(address reserve, uint256 amount) public {
-        address SimpleLendingAddress = trusty.getSimpleLendingAddress();
+        address simpleLendingAddress = trusty.getSimpleLendingAddress();
         bytes memory abiEncoding = abi.encodeWithSignature(
             "borrow(address,uint256)",
             reserve,
             amount
         );
-        bytes memory collateralManagerAbiEncoding = abi.encodeWithSignature(
-            "makeCall(address,bytes)",
-            SimpleLendingAddress,
-            abiEncoding
-        );
-        // simpleLendingCollateralManager._upgradeTo(2, address(uint160(address(SimpleLendingAddress))));
-        bool success = userProxy.proxyCall(address(simpleLendingCollateralManager), collateralManagerAbiEncoding);
+        UserProxy userProxy = UserProxy(userProxyFactory.getUserProxyAddress(msg.sender));
+        bool success = userProxy.proxyCall(simpleLendingAddress, abiEncoding);
         require(success, "borrow failed");
-        // ltcr.update(agentOwner, borrowAction);
+        ltcr.update(address(userProxy), borrowAction);
     }
 
 }
