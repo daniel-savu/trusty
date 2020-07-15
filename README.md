@@ -28,7 +28,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][architecture-diagram]]
+<img src="images/architecture.png" alt="Architecture Diagram">
 
 Trusty aims to compute cross-protocol reputation for DeFi users. By performing desired actions in one protocol, the user can reduce
 their collateral ratio across all protocols that integrate with Trusty.
