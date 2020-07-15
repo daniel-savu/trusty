@@ -55,7 +55,6 @@ To get a local copy up and running follow these simple example steps.
 ### Prerequisites
 
 To install dependencies, run:
-* npm
 ```sh
 npm install npm@latest -g
 ```
@@ -67,7 +66,9 @@ npm install npm@latest -g
 The test showcases the usage of Trusty in a Simple Lending Protocol with mock Dai (a basic ERC-20 token).
 
 Run:
-`npx buidler test`
+```sh
+npx buidler test
+```
 
 There is no need to connect to an Ethereum node, as Buidler runs the tests in its custom Buidler EVM, which facilitates debugging.
 
