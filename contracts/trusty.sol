@@ -25,84 +25,14 @@ contract Trusty {
 
     constructor() public {
         simpleLendingLTCR = new LTCR();
-        initializeSimpleLendingLTCR();
         uint baseCollateralisationRateValue = 1500;
         simpleLendingLTCR.addAuthorisedContract(address(userProxyFactory));
-        // temporary deployment simpleLending related contracts
         simpleLending = new SimpleLending(address(this), baseCollateralisationRateValue);
         userProxyFactory = new UserProxyFactory(
             address(simpleLendingLTCR),
             address(this)
         );
         initializeSimpleLendingProxy();
-    }
-
-    function initializeSimpleLendingLTCR() private {
-        uint depositAction;
-        uint borrowAction;
-        uint repayAction;
-        uint liquidationCallAction;
-        uint flashLoanAction;
-        uint redeemAction;
-
-        // Below are some mock layer factors for demonstration purposes.
-        // Proper factors need to be chosen following a game theoretical analysis,
-        // like in the section 7 of the Balance paper: https://dl.acm.org/doi/pdf/10.1145/3319535.3354221
-
-        simpleLendingLayers.push(1);
-        simpleLendingLayers.push(2);
-        simpleLendingLayers.push(3);
-        simpleLendingLayers.push(4);
-        simpleLendingLayers.push(5);
-
-        // the Layer Token Curated Registry contract (LTCR) uses 3 decimals
-        // the LTCR is based on Balance: https://github.com/nud3l/balance
-        simpleLendingLayerFactors.push(1000); // 100% of the collateral must be paid
-        simpleLendingLayerFactors.push(900);
-        simpleLendingLayerFactors.push(850); // 85% of the collateral must be paid
-        simpleLendingLayerFactors.push(800);
-        simpleLendingLayerFactors.push(750);
-
-        simpleLendingLayerLowerBounds.push(0);
-        simpleLendingLayerLowerBounds.push(20);
-        simpleLendingLayerLowerBounds.push(40);
-        simpleLendingLayerLowerBounds.push(60);
-        simpleLendingLayerLowerBounds.push(80);
-
-        simpleLendingLayerUpperBounds.push(25);
-        simpleLendingLayerUpperBounds.push(45);
-        simpleLendingLayerUpperBounds.push(65);
-        simpleLendingLayerUpperBounds.push(85);
-        simpleLendingLayerUpperBounds.push(10000);
-
-        simpleLendingLTCR.setLayers(simpleLendingLayers);
-
-        for (uint8 i = 0; i < simpleLendingLayers.length; i++) {
-            simpleLendingLTCR.setFactor(simpleLendingLayers[i], simpleLendingLayerFactors[i]);
-        }
-
-        for (uint8 i = 0; i < simpleLendingLayers.length; i++) {
-            simpleLendingLTCR.setBounds(simpleLendingLayers[i], simpleLendingLayerLowerBounds[i], simpleLendingLayerUpperBounds[i]);
-        }
-
-        // setting the reward for each action
-        // ideally, the reward depends on the parameters of the call to Aave
-        // but for now, a certain action will carry a certain score.
-        // The rewards could potentially be decided by the Aave Protocol Governance
-        // Mapping of actions to their id:
-        depositAction = 1;
-        borrowAction = 2;
-        repayAction = 3;
-        liquidationCallAction = 4;
-        flashLoanAction = 5;
-        redeemAction = 6;
-        
-        simpleLendingLTCR.setReward(depositAction, 15); // user can be promoted to next layer with two deposits
-        simpleLendingLTCR.setReward(borrowAction, 0);
-        simpleLendingLTCR.setReward(repayAction, 5);
-        simpleLendingLTCR.setReward(liquidationCallAction, 10);
-        simpleLendingLTCR.setReward(flashLoanAction, 10);
-        simpleLendingLTCR.setReward(redeemAction, 0);
     }
 
     function getUserProxyFactoryAddress() public view returns (address) {
@@ -140,9 +70,6 @@ contract Trusty {
     }
 
     function initializeSimpleLendingProxy() private {
-        console.log("in initializeSimpleLendingProxy");
-        console.log(address(userProxyFactory));
-        console.log(address(simpleLendingLTCR));
         trustySimpleLendingProxy = new TrustySimpleLendingProxy(
             address(simpleLendingLTCR),
             address(this),

@@ -161,7 +161,6 @@ contract UserProxy is Ownable {
             subtractFunds(reserve, amount);
         }
         bool success;
-        console.log("in proxyCall");
 
         if(amount > 0) {
             require(reserve != address(0), "Reserve address cannot be 0");
@@ -169,8 +168,6 @@ contract UserProxy is Ownable {
                 IERC20(reserve).approve(target, amount);
                 (success, ) = target.call(abiEncoding);
             } else {
-                console.log("calling with value");
-                // console.log(amount);
                 (success, ) = target.call.value(amount)(abiEncoding);
             }
         } else {

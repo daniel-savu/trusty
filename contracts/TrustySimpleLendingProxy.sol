@@ -63,7 +63,8 @@ contract TrustySimpleLendingProxy is Ownable {
     // LendingPool contract
 
     function deposit(address reserve, uint256 amount) public {
-        console.log("in trustySLProxy");
+        console.log("depositing");
+        console.log(amount);
         address simpleLendingAddress = trusty.getSimpleLendingAddress();
         bytes memory abiEncoding = abi.encodeWithSignature(
             "deposit(address,uint256)",

@@ -66,10 +66,17 @@ contract LTCR is Ownable {
         return _layers;
     }
 
-    function setLayers(uint8[] memory layers) public returns (bool) {
+    function setLayers(uint8[] memory layers) public {
          // set layers
         _layers = layers;
-        return true;
+    }
+
+    function resetLayers() public {
+        delete _layers;
+    }
+
+    function addLayer(uint layer) public {
+        _layers.push(layer);
     }
 
     // ##############
@@ -159,8 +166,6 @@ contract LTCR is Ownable {
     }
 
     function registerAgent(address agent) public returns (bool) {
-        console.log("LTCR registering:");
-        console.log(agent);
         // register agent
         _agents[agent] = true;
         // asign agent to lowest layer

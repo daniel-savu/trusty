@@ -24,8 +24,6 @@ contract SimpleLending is Ownable {
         baseCollateralisationRate = baseCollateralisationRateValue;
         trusty = Trusty(trustyAddress);
         reserves.push(ethAddress);
-        console.log("SimpleLending address:");
-        console.log(address(this));
     }
 
     function() external payable {
@@ -45,7 +43,6 @@ contract SimpleLending is Ownable {
     }
 
     function deposit(address reserve, uint256 amount) public payable {
-        console.log("in SimpleLending deposit");
         if(reserve == ethAddress) {
             require(msg.value == amount, "amount is different from msg.value");
         } else {
@@ -53,12 +50,9 @@ contract SimpleLending is Ownable {
         }
         userDeposits[msg.sender][reserve] += amount;
         reserveLiquidity[reserve] += amount;
-        console.log("received deposit");
-        console.log(userDeposits[msg.sender][reserve]);
     }
 
     function borrow(address reserve, uint256 amount) public hasEnoughCollateral(reserve, amount) {
-        console.log("in SimpleLending borrow");
         require(reserveLiquidity[reserve] >= amount, "not enough reserve liquidity");
         makePayment(reserve, amount, msg.sender);
         userLoans[msg.sender][reserve] += amount;
