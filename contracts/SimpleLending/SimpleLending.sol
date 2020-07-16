@@ -75,7 +75,7 @@ contract SimpleLending is Ownable {
         // and check whether user is undercollateralized
         uint deposits = getAccountDeposits(borrower);
         uint borrows = getAccountBorrows(borrower);
-        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAgentCollateralizationRatio(borrower);
+        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactor(borrower);
         uint availableCollateral = deposits - borrows * accountCollateralizationRatio;
 
         require(availableCollateral < 0, "The account is already properly collateralized");
@@ -119,8 +119,6 @@ contract SimpleLending is Ownable {
         } else {
             loanWorthInETH = convert(ethAddress, reserve, amount);
         }
-        console.log("loanWorthInETH:");
-        console.log(loanWorthInETH);
         require(borrowableAmountInETH >= loanWorthInETH, "too little collateral");
         _;
     }
@@ -149,7 +147,7 @@ contract SimpleLending is Ownable {
     function getBorrowableAmountInETH(address account) public returns (uint) {
         uint deposits = getAccountDeposits(account);
         uint borrows = getAccountBorrows(account);
-        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAgentCollateralizationRatio(account);
+        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactor(account);
         uint borrowableAmountInETH = ((deposits * (10 ** collateralizationDecimals)) / accountCollateralizationRatio) - borrows;
         console.log("borrowableAmountInETH:");
         console.log(borrowableAmountInETH);

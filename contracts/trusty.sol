@@ -5,59 +5,102 @@ import "@nomiclabs/buidler/console.sol";
 import "./LTCR.sol";
 import "./UserProxy.sol";
 import "./SimpleLending/SimpleLending.sol";
-import "./TrustySimpleLendingProxy.sol";
+import "./SimpleLendingProxy.sol";
+import "./SimpleLendingTwoProxy.sol";
 import "./UserProxyFactory.sol";
 // import "node_modules/@studydefi/money-legos/compound/contracts/ICEther.sol";
 
 
 contract Trusty {
     address constant aETHAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    UserProxyFactory userProxyFactory;
+
     LTCR simpleLendingLTCR;
+    LTCR simpleLendingTwoLTCR;
 
     SimpleLending simpleLending;
-    UserProxyFactory userProxyFactory;
-    TrustySimpleLendingProxy trustySimpleLendingProxy;
+    SimpleLending simpleLendingTwo;
 
-    uint8[] simpleLendingLayers;
-    uint256[] simpleLendingLayerFactors;
-    uint256[] simpleLendingLayerLowerBounds;
-    uint256[] simpleLendingLayerUpperBounds;
+    SimpleLendingProxy simpleLendingProxy;
+    SimpleLendingTwoProxy simpleLendingTwoProxy;
 
     constructor() public {
-        simpleLendingLTCR = new LTCR();
         uint baseCollateralisationRateValue = 1500;
+
+        simpleLendingLTCR = new LTCR();
         simpleLendingLTCR.addAuthorisedContract(address(userProxyFactory));
         simpleLending = new SimpleLending(address(this), baseCollateralisationRateValue);
+
+        simpleLendingTwoLTCR = new LTCR();
+        simpleLendingTwoLTCR.addAuthorisedContract(address(userProxyFactory));
+        simpleLendingTwo = new SimpleLending(address(this), baseCollateralisationRateValue);
+
         userProxyFactory = new UserProxyFactory(
             address(simpleLendingLTCR),
+            address(simpleLendingTwoLTCR),
             address(this)
         );
-        initializeSimpleLendingProxy();
+        
+        simpleLendingProxy = new SimpleLendingProxy(
+            address(simpleLendingLTCR),
+            address(this),
+            address(userProxyFactory)
+        );
+
+        simpleLendingTwoProxy = new SimpleLendingTwoProxy(
+            address(simpleLendingTwoLTCR),
+            address(this),
+            address(userProxyFactory)
+        );
+    }
+
+    function() external payable {
+        console.log("reached the fallback");
     }
 
     function getUserProxyFactoryAddress() public view returns (address) {
         return address(userProxyFactory);
     }
 
-    function getSimpleLendingRealAddress() public view returns (address) {
-        return address(simpleLending);
-    }
-
     function getSimpleLendingLTCR() public view returns (address) {
         return address(simpleLendingLTCR);
+    }
+
+    function getSimpleLendingTwoLTCR() public view returns (address) {
+        return address(simpleLendingTwoLTCR);
     }
 
     function getSimpleLendingAddress() public view returns (address) {
         return address(simpleLending);
     }
 
-    function getAgentCollateralizationRatio(address agent) public returns (uint256) {
+    function getSimpleLendingTwoAddress() public view returns (address) {
+        return address(simpleLendingTwo);
+    }
+
+    function getAggregateAgentFactor(address agent) public returns (uint256) {
         // a factor of 1500 is equal to 1.5 times the collateral
-        return aggregateLTCRs(agent);
+        uint aggregateAgentFactor = aggregateLTCRs(agent);
+        console.log("aggregateAgentFactor:");
+        console.log(aggregateAgentFactor);
+        return aggregateAgentFactor;
     }
 
     function aggregateLTCRs(address agent) public returns (uint) {
-        return simpleLendingLTCR.getAgentFactor(agent);
+        uint agentFactorSum = 0;
+        uint agentFactorCount = 0;
+        if(simpleLendingLTCR.getInteractionCount(agent) > 0) {
+            agentFactorSum += simpleLendingLTCR.getAgentFactor(agent);
+            agentFactorCount += 1;
+        }
+        if(simpleLendingTwoLTCR.getInteractionCount(agent) > 0) {
+            agentFactorSum += simpleLendingTwoLTCR.getAgentFactor(agent);
+            agentFactorCount += 1;
+        }
+        if(agentFactorCount > 0) {
+            return agentFactorSum / agentFactorCount;
+        }
+        return 1000;
     }
 
     function moveFundsToUserProxy(address agentOwner, address _reserve, uint _amount) public {
@@ -69,26 +112,21 @@ contract Trusty {
         }
     }
 
-    function initializeSimpleLendingProxy() private {
-        trustySimpleLendingProxy = new TrustySimpleLendingProxy(
-            address(simpleLendingLTCR),
-            address(this),
-            address(userProxyFactory)
-        );
-        // simpleLendingLTCR.addAuthorisedContract(address(trustySimpleLendingProxy));
-        // userProxy.addAuthorisedContract(address(agentSimpleLendingContracts[msg.sender]));
+    function setSimpleLendingProxy(address payable simpleLendingProxyAddress) public {
+        simpleLendingProxy = SimpleLendingProxy(simpleLendingProxyAddress);
     }
 
-    function setTrustySimpleLendingProxy(address payable trustySimpleLendingProxyAddress) public {
-        trustySimpleLendingProxy = TrustySimpleLendingProxy(trustySimpleLendingProxyAddress);
+    function getSimpleLendingProxy()  public view returns (address) {
+        return address(simpleLendingProxy);
     }
 
-    function getTrustySimpleLendingProxy()  public view returns (address) {
-        return address(trustySimpleLendingProxy);
+    function getSimpleLendingTwoProxy()  public view returns (address) {
+        return address(simpleLendingTwoProxy);
     }
 
-    function() external payable {
-        console.log("reached the fallback");
+    function curateLTCRs() public {
+        simpleLendingLTCR.curate();
+        simpleLendingTwoLTCR.curate();
     }
 
 }

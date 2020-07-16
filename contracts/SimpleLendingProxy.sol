@@ -11,7 +11,7 @@ import "./SimpleLending/SimpleLending.sol";
 
 // import "./InitializableAdminUpgradeabilityProxy.sol";
 
-contract TrustySimpleLendingProxy is Ownable {
+contract SimpleLendingProxy is Ownable {
     address constant LendingPoolAddressesProviderAddress = 0x24a42fD28C976A61Df5D00D0599C34c4f90748c8;
     address constant aETHAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant aETHContractAddress = 0x3a3A65aAb0dd2A17E3F1947bA16138cd37d08c04;
@@ -63,15 +63,14 @@ contract TrustySimpleLendingProxy is Ownable {
     // LendingPool contract
 
     function deposit(address reserve, uint256 amount) public {
-        console.log("depositing");
-        console.log(amount);
         address simpleLendingAddress = trusty.getSimpleLendingAddress();
         bytes memory abiEncoding = abi.encodeWithSignature(
             "deposit(address,uint256)",
             reserve,
             amount
         );
-        UserProxy userProxy = UserProxy(userProxyFactory.getUserProxyAddress(msg.sender));
+        address payable a = userProxyFactory.getUserProxyAddress(msg.sender);
+        UserProxy userProxy = UserProxy(a);
         bool success = userProxy.proxyCall(simpleLendingAddress, abiEncoding, reserve, amount);
         require(success, "deposit failed");
         ltcr.update(address(userProxy), depositAction);

@@ -68,48 +68,16 @@ contract UserProxy is Ownable {
         _;
     }
 
-    function subtractFunds(address _reserve, uint256 _amount) private {
-        int256 amount = uintToInt(_amount);
-        // agentFundsInPool[_reserve] can be negative but this is accounted for
-        if(_reserve != aETHAddress) {
-            int256 ERCTokenBalance = uintToInt(IERC20(_reserve).balanceOf(address(this)));
-            int256 fundsInPool = agentFundsInPool[_reserve];
-            require(ERCTokenBalance + fundsInPool >= amount, "You don't have enough funds");
-            if(ERCTokenBalance < amount && ERCTokenBalance + fundsInPool >= amount) {
-                uint256 difference = intToUint(amount - ERCTokenBalance);
-                trustyContract.moveFundsToUserProxy(agentOwner, _reserve, difference);
-                agentFundsInPool[_reserve] -= amount;
-            }
+    function hasEnoughFunds(address reserve, uint amount) internal returns (bool) {
+        if(reserve != aETHAddress) {
+            return IERC20(reserve).balanceOf(address(this)) >= amount;
         } else {
-            int256 ethBalance = uintToInt(address(this).balance);
-            int256 fundsInPool = agentFundsInPool[aETHAddress];
-            require(ethBalance + fundsInPool >= amount, "You don't have enough funds");
-            if(ethBalance < amount && ethBalance + fundsInPool >= amount) {
-                uint256 difference = intToUint(amount - ethBalance);
-                trustyContract.moveFundsToUserProxy(agentOwner, _reserve, difference);
-                agentFundsInPool[_reserve] -= amount;
-            }
+            return address(this).balance >= amount;
         }
     }
 
-    function uintToInt(uint256 a) private pure returns (int256) {
-        require(a < INT256_MAX, "uint value is too big to convert to int");
-        return int256(a);
-    }
-
-    function intToUint(int256 a) private pure returns (uint256) {
-        require(a >= 0, "int value is too small to convert to uint");
-        return uint256(a);
-    }
-
-    function moveFundsToPool(address _reserve, uint256 _amount) public onlyOwner {
-        subtractFunds(_reserve, _amount);
-        agentFundsInPool[_reserve] += uintToInt(_amount);
-        withdrawFunds(_reserve, _amount);
-    }
-
     function withdrawFunds(address _reserve, uint256 _amount) public onlyAgentOwner {
-        subtractFunds(_reserve, _amount);
+        require(hasEnoughFunds(_reserve, _amount), "You don't have enough funds");
         if(_reserve != aETHAddress) {
             IERC20(_reserve).transfer(msg.sender, _amount);
         } else {
@@ -125,19 +93,11 @@ contract UserProxy is Ownable {
         }
     }
 
-    function getFundsInPool(address _reserve) public view returns(int256) {
-        return agentFundsInPool[_reserve];
-    }
-
     function getTotalBalance(address _reserve) public view returns(uint256) {
         if(_reserve != aETHAddress) {
-            uint256 ERCTokenBalance = IERC20(_reserve).balanceOf(address(this));
-            uint256 fundsInPool = intToUint(agentFundsInPool[_reserve]);
-            return ERCTokenBalance + fundsInPool;
+            return IERC20(_reserve).balanceOf(address(this));
         } else {
-            uint256 balance = address(this).balance;
-            uint256 fundsInPool = intToUint(agentFundsInPool[aETHAddress]);
-            return balance + fundsInPool;
+            return address(this).balance;
         }
     }
 
@@ -149,7 +109,6 @@ contract UserProxy is Ownable {
         return proxyCallResult;
     }
 
-// when calling the CM, pass target as a parameter; also pass abiEncoding as a parameter
     function proxyCall(
         address target,
         bytes memory abiEncoding,
@@ -158,7 +117,7 @@ contract UserProxy is Ownable {
     ) public onlyAuthorised payable returns (bool) {
         require(target != address(0), "Target address cannot be 0");
         if(reserve != address(0)) {
-            subtractFunds(reserve, amount);
+            require(hasEnoughFunds(reserve, amount), "You don't have enough funds");
         }
         bool success;
 
@@ -173,7 +132,6 @@ contract UserProxy is Ownable {
         } else {
             (success, ) = target.call(abiEncoding);
         }
-        
         return success;
     }
 

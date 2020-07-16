@@ -3,7 +3,7 @@ pragma solidity ^0.5.0;
 import "./LTCR.sol";
 import "./Trusty.sol";
 import "./UserProxy.sol";
-import "./TrustySimpleLendingProxy.sol";
+import "./SimpleLendingProxy.sol";
 import "@nomiclabs/buidler/console.sol";
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 
@@ -13,15 +13,17 @@ contract UserProxyFactory is Ownable {
     mapping (address => address) userProxyToUserAddress;
 
     LTCR simpleLendingLTCR;
+    LTCR simpleLendingTwoLTCR;
     Trusty trusty;
     mapping (address => bool) isAgentInitialized;
 
-
     constructor(
         address simpleLendingLTCRAddress,
+        address simpleLendingTwoLTCRAddress,
         address payable trustyAddress
     ) public {
         simpleLendingLTCR = LTCR(simpleLendingLTCRAddress);
+        simpleLendingTwoLTCR = LTCR(simpleLendingTwoLTCRAddress);
         trusty = Trusty(trustyAddress);
     }
 
@@ -33,10 +35,10 @@ contract UserProxyFactory is Ownable {
             userAddressToUserProxy[msg.sender] = userProxy;
             userProxyToUserAddress[address(userProxy)] = msg.sender;
             simpleLendingLTCR.registerAgent(address(userProxy));
+            simpleLendingTwoLTCR.registerAgent(address(userProxy));
             // add other protocol initializations here
             // such as initializeCompoundProxy when done
             isAgentInitialized[msg.sender] = true;
-            
         }
     }
 

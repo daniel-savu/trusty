@@ -21,6 +21,7 @@ contract LTCR is Ownable {
     // Implementation of the registry
     mapping (uint256 => mapping (address => uint)) _assignments; // layer assignment by round and agent
     mapping (uint256 => mapping (address => uint256)) _scores; // score by round and agent
+    mapping (address => uint256) _interactionCount;
     uint256 _round; // current round in the protocol
     
     mapping (address => bool) _agents; // track all agents
@@ -82,7 +83,7 @@ contract LTCR is Ownable {
     // ##############
     // ### FACTOR ###
     // ##############
-    function getAgentFactor(address agent) public view returns (uint256) {   
+    function getAgentFactor(address agent) public view returns (uint256) {
         uint assignment = getAssignment(agent);
 
         require(assignment > 0, "agent not assigned to layer");
@@ -140,7 +141,7 @@ contract LTCR is Ownable {
     function getAssignment(address agent) public view returns(uint assignment) {
         // check if agent is registered
         if (_agents[agent]) {
-            // check if agent is assigned to a layer in the current round        
+            // check if agent is assigned to a layer in the current round
             if (_assignments[_round][agent] == 0) {
                 // check if the agent was assigned to a layer in previous rounds
                 for (uint i = 1; i < _layers.length && i < _round; i++) {
@@ -163,6 +164,10 @@ contract LTCR is Ownable {
         require(assignment > 0, "agent not assigned to layer");
 
         return _scores[_round][agent];
+    }
+
+    function getInteractionCount(address agent) public view returns (uint256) {
+        return _interactionCount[agent];
     }
 
     function registerAgent(address agent) public returns (bool) {
@@ -191,6 +196,8 @@ contract LTCR is Ownable {
         uint assignment = getAssignment(agent);
 
         require(assignment > 0, "agent not assigned to layer");
+
+        _interactionCount[agent] += 1;
 
         // promote the agent to the next layer
         if (_scores[_round][agent] >= _upper[assignment] && assignment != _layers.length) {
