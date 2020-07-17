@@ -3,8 +3,9 @@ pragma solidity ^0.5.0;
 // import "./InitializableAdminUpgradeabilityProxy.sol";
 import "@openzeppelin/contracts/ownership/Ownable.sol";
 import "@nomiclabs/buidler/console.sol";
+import "./ILTCR.sol";
 
-contract LTCR is Ownable {
+contract LTCR is Ownable, ILTCR {
     address[] authorisedContracts;
 
     uint256 _decimals; // decimals to calculate collateral factor
@@ -29,6 +30,8 @@ contract LTCR is Ownable {
     uint256 _blockperiod; // block period until curation
     uint256 _start; // start of period
     uint256 _end; // end of period
+    mapping(address => uint) compatibilityScores;
+
 
     constructor() public {
         // addAuthorisedContract(msg.sender);
@@ -57,6 +60,17 @@ contract LTCR is Ownable {
         // }
         // require(isAuthorised == true, "Caller is not authorised to perform this action");
         _;
+    }
+
+    function getCompatibilityScoreWith(address protocol) external view returns (uint256) {
+        if(protocol == address(this)) {
+            return 100;
+        }
+        return compatibilityScores[protocol];
+    }
+
+    function setCompatibilityScoreWith(address protocol, uint256 score) external {
+        compatibilityScores[protocol] = score;
     }
     
     // ##############

@@ -17,7 +17,6 @@ contract SimpleLending is Ownable {
     Trusty trusty;
     address ethAddress = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 collateralizationDecimals = 3; // decimals to calculate collateral factor
-
     uint conversionDecimals = 25;
 
     constructor(address payable trustyAddress, uint baseCollateralisationRateValue) public {
@@ -76,7 +75,7 @@ contract SimpleLending is Ownable {
         // and check whether user is undercollateralized
         (uint deposits, ) = getAccountDeposits(borrower);
         (uint borrows, ) = getAccountBorrows(borrower);
-        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactor(borrower);
+        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactorForProtocol(borrower, address(this));
         uint availableCollateral = deposits - borrows * accountCollateralizationRatio;
         // deposits and borrows are expressed as numbers multiplied by 10 ** conversionDecimals
         availableCollateral = divideByConversionDecimals(availableCollateral);
@@ -102,7 +101,6 @@ contract SimpleLending is Ownable {
         (uint collateralInUse, ) = getCollateralInUse(msg.sender);
         (uint deposits, ) = getAccountDeposits(msg.sender);
         require(deposits >= collateralInUse, "agent would become undercollateralized after redeem");
-        console.log("enough balance");
         uint userLiquidity = userDeposits[msg.sender][reserve] - userLoans[msg.sender][reserve];
         require(userLiquidity > 0, "You don't have enough liquidity in this reserve");
         makePayment(reserve, amount, msg.sender);
@@ -155,9 +153,10 @@ contract SimpleLending is Ownable {
     }
 
     function getBorrowableAmountInETH(address account) public returns (uint, uint) {
+        console.log("in getBorrowableAmountInETH");
         (uint deposits, ) = getAccountDeposits(account);
         (uint borrows, ) = getAccountBorrows(account);
-        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactor(account);
+        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactorForProtocol(account, address(this));
         uint borrowableAmountInETH = (deposits / accountCollateralizationRatio) - borrows;
         console.log("borrowableAmountInETH *(10^25):");
         console.log(borrowableAmountInETH);
@@ -167,7 +166,7 @@ contract SimpleLending is Ownable {
     function getCollateralInUse(address account) public returns (uint, uint) {
         (uint deposits, ) = getAccountDeposits(account);
         (uint borrows, ) = getAccountBorrows(account);
-        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactor(account);
+        uint accountCollateralizationRatio = baseCollateralisationRate * trusty.getAggregateAgentFactorForProtocol(account, address(this));
         uint collateralInUse = deposits - (borrows * accountCollateralizationRatio);
         return (collateralInUse, conversionDecimals);
     }
