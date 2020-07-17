@@ -131,6 +131,10 @@ contract("SimpleLending Protocol", accounts => {
         return lendingProtocol;
     }
 
+    function divideByConversionDecimals(obj: {0: number, 1: number}) {
+        return (obj[0] / (10 ** obj[1]))
+    }
+
     // async function deposit
 
     before(async function() {
@@ -147,8 +151,8 @@ contract("SimpleLending Protocol", accounts => {
         // let daiMocks = await daiMock.balanceOf(simpleLending.address)
         // console.log(`daiMock balance in SL: ${daiMocks}`);
 
-        let conversionRate = await simpleLending.conversionRate(daiMock.address, ethAddress);
-        console.log(`(conversion rate from daiMock to eth: ${conversionRate})`);
+        let conversionRate = await simpleLending.conversionRate(ethAddress, daiMock.address);
+        console.log(`(conversion rate from eth to daiMock: ${divideByConversionDecimals(conversionRate)})`);
 
         // let conversionValue = await simpleLending.convert(daiMock.address, ethAddress, 684);
         // console.log(`converting 684 from daiMock to eth: ${conversionValue}`);
@@ -157,7 +161,7 @@ contract("SimpleLending Protocol", accounts => {
         // console.log(`Account balance in SimpleLending: ${userSimpleLendingBalance}`)
     });
 
-    xit("Should deposit to SimpleLending only", async function () {
+    xit("Should deposit to SimpleLending", async function () {
         const userProxyFactoryAddress = await trusty.getUserProxyFactoryAddress();
         const userProxyFactory = await UserProxyFactory.at(userProxyFactoryAddress);
         await userProxyFactory.addAgent();
@@ -204,7 +208,81 @@ contract("SimpleLending Protocol", accounts => {
         console.log(`(conversion rate from daiMock to eth: ${conversionRate})`);
     });
 
-    it("Should deposit to SimpleLending and SimpleLendingTwo", async function () {
+    it("Should deposit to, borrow from and repay to SimpleLending", async function () {
+        const userProxyFactoryAddress = await trusty.getUserProxyFactoryAddress();
+        const userProxyFactory = await UserProxyFactory.at(userProxyFactoryAddress);
+        await userProxyFactory.addAgent();
+        const simpleLendingProxyAddress = await trusty.getSimpleLendingProxy();
+        const simpleLendingProxy = await SimpleLendingProxy.at(simpleLendingProxyAddress);
+
+        const userProxyAddress = await userProxyFactory.getUserProxyAddress(accs[0]);
+        const up = await userProxy.at(userProxyAddress);
+        let tr = await up.depositFunds(
+            ethAddress,
+            web3.utils.toWei('2', 'ether'),
+            {
+                from: accs[0],
+                gasLimit: web3.utils.toHex(1500000),
+                gasPrice: web3.utils.toHex(20000000000),
+                value: web3.utils.toHex(web3.utils.toWei('2', 'ether'))
+            }
+        );
+
+        console.log("The base collateralization ratio in SimpleLending is 150%");
+        await trusty.getAggregateAgentFactor(up.address); //prints to console in buidler
+        
+        tr = await simpleLendingProxy.deposit(
+            ethAddress,
+            web3.utils.toWei('1', 'ether')
+        );
+        console.log("Deposited 1 Ether in SimpleLending")
+
+        tr = await simpleLendingProxy.deposit(
+            ethAddress,
+            web3.utils.toWei('1', 'ether')
+        );
+        console.log("Deposited 1 Ether in SimpleLending")
+        await simpleLending.getBorrowableAmountInETH(up.address); //prints to console in buidler
+
+        // const agentScore = await simpleLendingLTCR.getScore(up.address);
+        // console.log(`the score of the agent in Trusty (before round end): ${agentScore}`);
+        console.log("Ending round. User wil be promoted to a higher layer.");
+        await trusty.curateLTCRs();
+        await simpleLending.getBorrowableAmountInETH(up.address); //prints to console in buidler
+
+        let conversionRate = await simpleLending.conversionRate(daiMock.address, ethAddress);
+        console.log(`(conversion rate from DaiMock to eth: ${divideByConversionDecimals(conversionRate)})`);
+
+        tr = await simpleLendingProxy.borrow(
+            daiMock.address,
+            "1"
+        );
+        console.log("Borrowed 1 DaiMock");
+
+        tr = await simpleLendingProxy.repay(
+            daiMock.address,
+            "1",
+            up.address
+        );
+        console.log("Repaid loan of 1 DaiMock");
+
+        conversionRate = await simpleLending.conversionRate(ethAddress, daiMock.address);
+        console.log(`(conversion rate from ETH to DaiMock: ${divideByConversionDecimals(conversionRate)})`);
+
+        conversionRate = await simpleLending.convert(daiMock.address, ethAddress, "1");
+        console.log(`(conversion rate from DaiMock to ETH: ${divideByConversionDecimals(conversionRate)})`);
+
+        let userSimpleLendingBorrows = await simpleLending.getAccountBorrows(up.address);
+        console.log(`User borrows in SimpleLending (in ETH):   ${divideByConversionDecimals(userSimpleLendingBorrows)}`)
+
+        tr = await simpleLendingProxy.redeem(
+            ethAddress,
+            web3.utils.toWei('1', 'ether')
+        );
+        console.log("Redeemed 1 ETH");
+    });
+
+    xit("Should deposit to SimpleLending and SimpleLendingTwo", async function () {
         const userProxyFactoryAddress = await trusty.getUserProxyFactoryAddress();
         const userProxyFactory = await UserProxyFactory.at(userProxyFactoryAddress);
         await userProxyFactory.addAgent();

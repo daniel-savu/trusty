@@ -21,7 +21,7 @@ contract SimpleLendingProxy is Ownable {
     uint256 depositAction;
     uint256 borrowAction;
     uint256 repayAction;
-    uint256 liquidationCallAction;
+    uint256 liquidateAction;
     uint256 flashLoanAction;
     uint256 redeemAction;
     Trusty trusty;
@@ -38,7 +38,7 @@ contract SimpleLendingProxy is Ownable {
         depositAction = 1;
         borrowAction = 2;
         repayAction = 3;
-        liquidationCallAction = 4;
+        liquidateAction = 4;
         flashLoanAction = 5;
         redeemAction = 6;
     }
@@ -87,6 +87,48 @@ contract SimpleLendingProxy is Ownable {
         bool success = userProxy.proxyCall(simpleLendingAddress, abiEncoding);
         require(success, "borrow failed");
         ltcr.update(address(userProxy), borrowAction);
+    }
+
+    function repay(address reserve, uint256 amount, address onbehalf) public {
+        address simpleLendingAddress = trusty.getSimpleLendingAddress();
+        bytes memory abiEncoding = abi.encodeWithSignature(
+            "repay(address,uint256,address)",
+            reserve,
+            amount,
+            onbehalf
+        );
+        UserProxy userProxy = UserProxy(userProxyFactory.getUserProxyAddress(msg.sender));
+        bool success = userProxy.proxyCall(simpleLendingAddress, abiEncoding, reserve, amount);
+        require(success, "repayment failed");
+        ltcr.update(address(userProxy), repayAction);
+    }
+
+    function liquidate(address borrower, address collateralReserve, address loanReserve, uint256 loanAmount) public {
+        address simpleLendingAddress = trusty.getSimpleLendingAddress();
+        bytes memory abiEncoding = abi.encodeWithSignature(
+            "liquidate(address,address,address,uint256)",
+            borrower,
+            collateralReserve,
+            loanReserve,
+            loanAmount
+        );
+        UserProxy userProxy = UserProxy(userProxyFactory.getUserProxyAddress(msg.sender));
+        bool success = userProxy.proxyCall(simpleLendingAddress, abiEncoding, loanReserve, loanAmount);
+        require(success, "liquidation failed");
+        ltcr.update(address(userProxy), liquidateAction);
+    }
+
+    function redeem(address reserve, uint256 amount) public {
+        address simpleLendingAddress = trusty.getSimpleLendingAddress();
+        bytes memory abiEncoding = abi.encodeWithSignature(
+            "redeem(address,uint256)",
+            reserve,
+            amount
+        );
+        UserProxy userProxy = UserProxy(userProxyFactory.getUserProxyAddress(msg.sender));
+        bool success = userProxy.proxyCall(simpleLendingAddress, abiEncoding);
+        require(success, "redeem failed");
+        ltcr.update(address(userProxy), redeemAction);
     }
 
 }
